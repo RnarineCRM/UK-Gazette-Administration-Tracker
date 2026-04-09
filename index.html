@@ -1,0 +1,2862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UK Gazette Administration Tracker</title>
+
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+
+<!-- DataTables JS -->
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.colVis.min.js"></script>
+<script src="https://cdn.datatables.net/colreorder/1.7.0/js/dataTables.colReorder.min.js"></script>
+
+<!-- SheetJS for Excel export -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+<!-- Day.js for date handling -->
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+
+<style>
+/* ── Reset & Base ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.header {
+  background: linear-gradient(135deg, #0f1923 0%, #1a2a3a 100%);
+  color: #e8edf3;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  position: relative;
+  z-index: 100;
+}
+.header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.header h1 span {
+  color: #4ea8de;
+  font-weight: 700;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.header-badge {
+  background: #4ea8de;
+  color: #0f1923;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+/* ── Settings Toggle Button ─────────────────────────────── */
+.settings-toggle {
+  background: transparent;
+  border: 1px solid #4ea8de;
+  color: #4ea8de;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.settings-toggle:hover {
+  background: #4ea8de;
+  color: #0f1923;
+}
+
+/* ── Settings Panel ─────────────────────────────────────── */
+.settings-panel {
+  background: #1a2a3a;
+  color: #c8d6e5;
+  padding: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+  border-bottom: none;
+}
+.settings-panel.open {
+  max-height: 320px;
+  padding: 16px 24px;
+  border-bottom: 2px solid #4ea8de;
+}
+.settings-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+.setting-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.setting-group-stack {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
+}
+.setting-group-wide {
+  min-width: 320px;
+  flex: 1 1 420px;
+}
+.setting-group label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8899aa;
+  white-space: nowrap;
+}
+.text-input {
+  width: min(100%, 420px);
+  border: 1px solid #4b5d70;
+  border-radius: 4px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #e8edf3;
+  background: #10202f;
+}
+.text-input:focus {
+  outline: none;
+  border-color: #4ea8de;
+  box-shadow: 0 0 0 2px rgba(78,168,222,0.2);
+}
+.setting-help {
+  font-size: 12px;
+  color: #9fb3c8;
+  line-height: 1.4;
+  max-width: 520px;
+}
+.setting-group input[type="range"] {
+  width: 140px;
+  accent-color: #4ea8de;
+}
+.delay-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #4ea8de;
+  min-width: 48px;
+}
+.btn-danger {
+  background: #c0392b;
+  color: #fff;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.btn-danger:hover { background: #e74c3c; }
+
+/* ── Main Content Container ─────────────────────────────── */
+.container {
+  max-width: 100%;
+  padding: 16px 24px 24px;
+}
+
+/* ── Fetch Controls ─────────────────────────────────────── */
+.fetch-controls {
+  background: #fff;
+  border: 1px solid #dde2e8;
+  border-radius: 6px;
+  padding: 14px 20px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.btn-primary {
+  background: #2980b9;
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.btn-primary:hover { background: #3498db; }
+.btn-primary:disabled {
+  background: #7fb3d4;
+  cursor: not-allowed;
+}
+.fetch-separator {
+  width: 1px;
+  height: 28px;
+  background: #dde2e8;
+}
+.date-input {
+  border: 1px solid #c8d6e5;
+  border-radius: 4px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1a1a2e;
+  background: #fff;
+}
+.date-input:focus {
+  outline: none;
+  border-color: #4ea8de;
+  box-shadow: 0 0 0 2px rgba(78,168,222,0.2);
+}
+.date-label {
+  font-size: 12px;
+  color: #5a6c7d;
+  font-weight: 600;
+}
+
+/* ── Progress Bar ───────────────────────────────────────── */
+.progress-area {
+  background: #fff;
+  border: 1px solid #dde2e8;
+  border-radius: 6px;
+  padding: 12px 20px;
+  margin-bottom: 12px;
+  display: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.progress-area.visible { display: block; }
+.progress-bar-track {
+  background: #e8edf3;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.progress-bar-fill {
+  background: linear-gradient(90deg, #2980b9, #4ea8de);
+  height: 100%;
+  width: 0%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.progress-text {
+  font-size: 13px;
+  color: #5a6c7d;
+}
+.progress-text strong {
+  color: #1a1a2e;
+}
+.btn-cancel {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  padding: 5px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.btn-cancel:hover { background: #c0392b; }
+
+/* ── Summary Stats ──────────────────────────────────────── */
+.stats-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.stat-card {
+  background: #fff;
+  border: 1px solid #dde2e8;
+  border-radius: 6px;
+  padding: 12px 20px;
+  flex: 1;
+  min-width: 180px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.stat-card .stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #8899aa;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.stat-card .stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+.stat-card .stat-value.accent { color: #2980b9; }
+.stat-card .stat-detail {
+  font-size: 12px;
+  color: #5a6c7d;
+  margin-top: 2px;
+}
+
+/* ── Data Table Card ────────────────────────────────────── */
+.table-scroll-top {
+  display: none;
+  background: #fff;
+  border: 1px solid #dde2e8;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 22px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  position: sticky;
+  top: 8px;
+  z-index: 90;
+  cursor: grab;
+}
+.table-scroll-top.dragging { cursor: grabbing; }
+.table-scroll-sync {
+  height: 1px;
+}
+.table-card {
+  background: #fff;
+  border: 1px solid #dde2e8;
+  border-radius: 6px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  overflow-x: auto;
+}
+
+/* ── Floating bottom scrollbar ─────────────────────────── */
+.table-scroll-bottom {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 20px;
+  background: #f7f9fb;
+  border-top: 1px solid #c8d6e5;
+  z-index: 200;
+  cursor: grab;
+}
+.table-scroll-bottom.dragging { cursor: grabbing; }
+.table-scroll-bottom-inner {
+  height: 1px;
+}
+
+/* DataTables overrides */
+.dataTables_wrapper .dataTables_filter input {
+  border: 1px solid #c8d6e5;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 13px;
+  margin-left: 8px;
+}
+.dataTables_wrapper .dataTables_filter input:focus {
+  outline: none;
+  border-color: #4ea8de;
+  box-shadow: 0 0 0 2px rgba(78,168,222,0.2);
+}
+.dataTables_wrapper .dataTables_length select {
+  border: 1px solid #c8d6e5;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+table.dataTable {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  font-size: 13px;
+}
+.dataTables_wrapper .dataTables_scrollHead table.dataTable,
+.dataTables_wrapper .dataTables_scrollBody table.dataTable {
+  table-layout: fixed !important;
+}
+table.dataTable thead th {
+  background: #f7f9fb;
+  border-bottom: 2px solid #c8d6e5 !important;
+  color: #3d5167;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 12px !important;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.dataTable thead th.resizable-column {
+  padding-right: 20px !important;
+}
+.col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 10px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 20;
+}
+.col-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 18%;
+  bottom: 18%;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: rgba(61,81,103,0.18);
+  border-radius: 999px;
+}
+table.dataTable thead th:hover .col-resize-handle::after,
+body.column-resizing .col-resize-handle::after {
+  background: #2980b9;
+}
+body.column-resizing {
+  cursor: col-resize !important;
+  user-select: none;
+}
+body.horizontal-dragging {
+  user-select: none;
+  cursor: grabbing !important;
+}
+.table-card {
+  cursor: default;
+}
+table.dataTable tbody td {
+  padding: 8px 12px !important;
+  border-bottom: 1px solid #eef1f5 !important;
+  vertical-align: top;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  cursor: text;
+}
+table.dataTable thead th {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+}
+table.dataTable tbody tr:hover {
+  background: #f0f7fd !important;
+}
+table.dataTable tbody tr.odd { background: #fff; }
+table.dataTable tbody tr.even { background: #fafbfc; }
+
+/* Clickable links in table */
+table.dataTable a.notice-link {
+  color: #2980b9;
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+table.dataTable a.notice-link:hover {
+  text-decoration: underline;
+  color: #1a5276;
+}
+
+/* DataTables buttons */
+.dt-buttons .dt-button {
+  background: #f7f9fb !important;
+  border: 1px solid #c8d6e5 !important;
+  border-radius: 4px !important;
+  color: #3d5167 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 6px 14px !important;
+  margin-right: 6px !important;
+  transition: all 0.2s;
+}
+.dt-buttons .dt-button:hover {
+  background: #e8edf3 !important;
+  border-color: #4ea8de !important;
+  color: #1a1a2e !important;
+}
+
+.dataTables_info {
+  font-size: 12px;
+  color: #5a6c7d;
+  padding-top: 10px !important;
+}
+.dataTables_paginate .paginate_button {
+  font-size: 12px !important;
+  padding: 4px 10px !important;
+  border-radius: 3px !important;
+}
+.dataTables_paginate .paginate_button.current {
+  background: #2980b9 !important;
+  border-color: #2980b9 !important;
+  color: #fff !important;
+}
+
+/* ── Export Bar ──────────────────────────────────────────── */
+.export-bar {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.btn-export {
+  background: #27ae60;
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-export:hover { background: #2ecc71; }
+.btn-export.csv {
+  background: #8e44ad;
+}
+.btn-export.csv:hover { background: #9b59b6; }
+.export-count {
+  font-size: 12px;
+  color: #8899aa;
+}
+
+/* ── CRM Lookup Link ────────────────────────────────────── */
+.crm-lookup-link {
+  display: inline-block;
+  margin-left: 4px;
+  text-decoration: none;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+.crm-lookup-link:hover {
+  opacity: 1;
+}
+
+/* ── Footer ─────────────────────────────────────────────── */
+.footer {
+  text-align: center;
+  padding: 16px;
+  font-size: 11px;
+  color: #8899aa;
+  border-top: 1px solid #dde2e8;
+  margin-top: 24px;
+}
+
+/* ── Responsive tweaks ──────────────────────────────────── */
+@media (max-width: 768px) {
+  .fetch-controls { flex-direction: column; align-items: flex-start; }
+  .stats-bar { flex-direction: column; }
+  .settings-inner { flex-direction: column; align-items: flex-start; }
+  .setting-group-wide { min-width: 100%; width: 100%; }
+  .text-input { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<div class="header">
+  <h1><span>GAZETTE</span> Administration Tracker</h1>
+  <div class="header-right">
+    <span class="header-badge">UK Insolvency</span>
+    <button class="settings-toggle" id="settingsToggle">Settings</button>
+  </div>
+</div>
+
+<!-- ═══════════════════ SETTINGS PANEL ═══════════════════ -->
+<div class="settings-panel" id="settingsPanel">
+  <div class="settings-inner">
+    <div class="setting-group setting-group-stack setting-group-wide">
+      <label for="companiesHouseApiKey">Companies House API Key</label>
+      <input type="password" id="companiesHouseApiKey" class="text-input" placeholder="Optional - used for enrichment" autocomplete="off">
+      <span class="setting-help" id="companiesHouseStatus">No API key saved. Gazette-only fields will still load.</span>
+    </div>
+    <div class="setting-group">
+      <label for="fetchDelay">Fetch Delay</label>
+      <input type="range" id="fetchDelay" min="200" max="2000" step="50" value="750">
+      <span class="delay-value" id="delayValue">750ms</span>
+    </div>
+    <div class="setting-group">
+      <button class="btn-danger" id="clearAllData">Clear Stored Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
+<div class="container">
+
+  <!-- ── Fetch Controls ── -->
+  <div class="fetch-controls">
+    <button class="btn-primary" id="fetchToday">Fetch Today</button>
+    <div class="fetch-separator"></div>
+    <span class="date-label">From</span>
+    <input type="date" class="date-input" id="startDate">
+    <span class="date-label">To</span>
+    <input type="date" class="date-input" id="endDate">
+    <button class="btn-primary" id="fetchRange">Fetch Date Range</button>
+    <div class="fetch-separator"></div>
+    <button class="btn-primary" id="fetchNew">Fetch New Since Last Run</button>
+    <div class="fetch-separator"></div>
+    <button class="btn-primary" id="debugFetch" style="background:#e67e22">Debug API</button>
+  </div>
+
+  <!-- ── Progress Area ── -->
+  <div class="progress-area" id="progressArea">
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-info">
+      <span class="progress-text" id="progressText">Initializing...</span>
+      <button class="btn-cancel" id="cancelFetch">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ── Debug Output ── -->
+  <div id="debugArea" style="display:none; background:#1a1a2e; color:#0f0; border-radius:6px; padding:16px; margin-bottom:12px; font-family:Consolas,monospace; font-size:12px; max-height:500px; overflow:auto; white-space:pre-wrap; word-break:break-all;"></div>
+
+  <!-- ── Manual Paste Fallback ── -->
+  <div id="pasteArea" style="display:none; background:#fff; border:1px solid #dde2e8; border-radius:6px; padding:16px; margin-bottom:12px;">
+    <p style="margin-bottom:8px; font-weight:600; color:#1a1a2e;">Manual JSON Paste (CORS fallback)</p>
+    <p style="margin-bottom:8px; font-size:12px; color:#5a6c7d;">Open <a href="https://www.thegazette.co.uk/insolvency/notice/data.json?noticetype=2410&results-page-size=50&sort-by=latest-date" target="_blank" rel="noopener">this Gazette JSON URL</a> in a new tab, copy the entire response, and paste it below:</p>
+    <textarea id="pasteJson" style="width:100%; height:120px; font-family:Consolas,monospace; font-size:12px; border:1px solid #c8d6e5; border-radius:4px; padding:8px;" placeholder="Paste Gazette JSON response here..."></textarea>
+    <button class="btn-primary" id="parsePasted" style="margin-top:8px;">Parse Pasted JSON</button>
+  </div>
+
+  <!-- ── Summary Stats ── -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">Total Records</div>
+      <div class="stat-value accent" id="statTotal">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Records Today</div>
+      <div class="stat-value" id="statToday">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Date Range</div>
+      <div class="stat-value" id="statRange" style="font-size:15px;">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Updated</div>
+      <div class="stat-value" id="statUpdated" style="font-size:15px;">Never</div>
+    </div>
+  </div>
+
+  <!-- ── Data Table ── -->
+  <div class="table-scroll-top" id="tableScrollTop"><div class="table-scroll-sync" id="tableScrollSync"></div></div>
+  <div class="table-scroll-bottom" id="tableScrollBottom"><div class="table-scroll-bottom-inner" id="tableScrollBottomInner"></div></div>
+  <div class="table-card">
+    <table id="gazetteTable" class="display nowrap" style="width:100%">
+      <thead>
+        <tr>
+          <th>Publication Date</th>
+          <th>Company Name</th>
+          <th>DBA/FKA/AKA</th>
+          <th>URL Full Notice</th>
+          <th>Type of Corporate Insolvency</th>
+          <th>Notice ID</th>
+          <th>Company Number</th>
+          <th>URL Company Number</th>
+          <th>Court Name</th>
+          <th>Court Number</th>
+          <th>Nature of Business</th>
+          <th>Registered Office</th>
+          <th>Principal Trading Address</th>
+          <th>Date of Appointment</th>
+          <th>Important Message</th>
+          <th>Incorporated On</th>
+          <th>Nature of Business (SIC)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- ── Export Bar ── -->
+  <div class="export-bar">
+    <button class="btn-export" id="exportExcel">Export to Excel (.xlsx)</button>
+    <button class="btn-export csv" id="exportCsv">Export to CSV</button>
+    <span class="export-count" id="exportCount"></span>
+  </div>
+
+</div>
+
+<!-- ═══════════════════ FOOTER ═══════════════════ -->
+<div class="footer">
+  UK Gazette Administration Tracker &mdash; Data sourced from The Gazette (thegazette.co.uk)
+</div>
+
+<script>
+// ── CRM NatReg Lookup (global so onclick can reach it) ───
+window.crmLookup = function(companyNum) {
+  var cleaned = (companyNum || '').toString().replace(/\s+/g, '').toUpperCase();
+  if (!cleaned) { alert('No company number to look up.'); return; }
+  window.open('https://info.creditriskmonitor.com/Intranet/NatRegLookup.asp?NatRegNo=' + encodeURIComponent(cleaned), '_blank');
+};
+</script>
+
+<!-- ═══════════════════ APPLICATION SCRIPT ═══════════════════ -->
+<script>
+(function() {
+  'use strict';
+
+  // ── Constants ────────────────────────────────────────────
+  const STORAGE_KEY = 'gazette_data';
+  const SETTINGS_KEY = 'gazette_settings';
+  const COMPANIES_HOUSE_CACHE_KEY = 'gazette_ch_cache_v1';
+  const COLUMN_WIDTHS_KEY = 'gazette_column_widths_v1';
+  const LAST_UPDATED_KEY = 'gazette_last_updated';
+  const DEFAULT_SETTINGS = {
+    fetchDelay: 750,
+    companiesHouseApiKey: ''
+  };
+
+  // ── Column definitions (indices) ─────────────────────────
+  const COL = {
+    PUB_DATE: 0,
+    COMPANY_NAME: 1,
+    URL_NOTICE: 2,
+    TYPE: 3,
+    NOTICE_ID: 4,
+    COMPANY_NUM: 5,
+    URL_COMPANY: 6,
+    COURT_NAME: 7,
+    COURT_NUM: 8,
+    TRADING_NAME: 9,
+    NATURE_BIZ: 10,
+    REG_OFFICE: 11,
+    PRINCIPAL_ADDR: 12,
+    DATE_APPT: 13,
+    ADMINS: 14,
+    CH_REG_ADDRESS: 15,
+    COMPANY_TYPE: 16,
+    INCORPORATED_ON: 17,
+    SIC_CODES: 18,
+    IMPORTANT_MSG: 19
+  };
+
+  // ── Settings Management ──────────────────────────────────
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (raw) return Object.assign({}, DEFAULT_SETTINGS, JSON.parse(raw));
+    } catch (e) { /* ignore */ }
+    return Object.assign({}, DEFAULT_SETTINGS);
+  }
+
+  function saveSettings(settings) {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      fetchDelay: settings.fetchDelay || DEFAULT_SETTINGS.fetchDelay,
+      companiesHouseApiKey: (settings.companiesHouseApiKey || '').trim()
+    }));
+  }
+
+  const settings = loadSettings();
+
+  // ── Data Store ───────────────────────────────────────────
+  // Allow older saved rows to load without breaking the expanded schema.
+  (function migrateData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      var arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) {
+        // Old format had different column count — clear it
+        localStorage.removeItem(STORAGE_KEY);
+        return;
+      } else if (arr.length > 0) {
+        var migrated = [];
+        var changed = false;
+        for (var i = 0; i < arr.length; i++) {
+          var normalized = normalizeStoredRow(arr[i]);
+          if (!normalized) {
+            changed = true;
+            continue;
+          }
+          if (!rowsEqual(normalized, arr[i])) changed = true;
+          migrated.push(normalized);
+        }
+        if (changed) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+          console.log('Migrated stored Gazette data to the latest schema.');
+        }
+      }
+    } catch (e) { /* ignore */ }
+  })();
+
+  function loadData() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.map(normalizeStoredRow).filter(Boolean).map(function(row) {
+          var lookup = normalizeCompanyLookupNumber(row[COL.COMPANY_NUM]);
+          if (lookup && companiesHouseCache[lookup]) {
+            applyCompaniesHouseEnrichment(row, companiesHouseCache[lookup]);
+          }
+          return row;
+        });
+      }
+    } catch (e) { console.warn('Failed to load stored data:', e); }
+    return [];
+  }
+
+  function saveData(data) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.warn('Failed to save data (localStorage may be full):', e);
+    }
+  }
+
+  function loadCompaniesHouseCache() {
+    try {
+      const raw = localStorage.getItem(COMPANIES_HOUSE_CACHE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) { console.warn('Failed to load Companies House cache:', e); }
+    return {};
+  }
+
+  function saveCompaniesHouseCache(cache) {
+    try {
+      localStorage.setItem(COMPANIES_HOUSE_CACHE_KEY, JSON.stringify(cache));
+    } catch (e) {
+      console.warn('Failed to save Companies House cache:', e);
+    }
+  }
+
+  var companiesHouseCache = loadCompaniesHouseCache();
+
+  function loadColumnWidths() {
+    try {
+      const raw = localStorage.getItem(COLUMN_WIDTHS_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) { console.warn('Failed to load column widths:', e); }
+    return {};
+  }
+
+  function saveColumnWidths(widths) {
+    try {
+      localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(widths));
+    } catch (e) {
+      console.warn('Failed to save column widths:', e);
+    }
+  }
+
+  var columnWidths = loadColumnWidths();
+
+  // ── Initialize UI Elements ───────────────────────────────
+  const $settingsToggle = $('#settingsToggle');
+  const $settingsPanel = $('#settingsPanel');
+  const $companiesHouseApiKey = $('#companiesHouseApiKey');
+  const $companiesHouseStatus = $('#companiesHouseStatus');
+  const $fetchDelay = $('#fetchDelay');
+  const $delayValue = $('#delayValue');
+  const $clearAllData = $('#clearAllData');
+  const $fetchToday = $('#fetchToday');
+  const $fetchRange = $('#fetchRange');
+  const $fetchNew = $('#fetchNew');
+  const $startDate = $('#startDate');
+  const $endDate = $('#endDate');
+  const $tableScrollTop = $('#tableScrollTop');
+  const $tableScrollSync = $('#tableScrollSync');
+  const $tableScrollBottom = $('#tableScrollBottom');
+  const $tableScrollBottomInner = $('#tableScrollBottomInner');
+  const $progressArea = $('#progressArea');
+  const $progressFill = $('#progressFill');
+  const $progressText = $('#progressText');
+  const $cancelFetch = $('#cancelFetch');
+  const $exportExcel = $('#exportExcel');
+  const $exportCsv = $('#exportCsv');
+  const $exportCount = $('#exportCount');
+
+  // ── Settings Panel Toggle ────────────────────────────────
+  $settingsToggle.on('click', function() {
+    $settingsPanel.toggleClass('open');
+    $(this).text($settingsPanel.hasClass('open') ? 'Close Settings' : 'Settings');
+  });
+
+  function setCompaniesHouseStatus(message) {
+    $companiesHouseStatus.text(message);
+  }
+
+  function refreshCompaniesHouseStatus() {
+    var hasKey = !!(settings.companiesHouseApiKey || '').trim();
+    if (!hasKey) {
+      setCompaniesHouseStatus('No API key saved. Gazette-only fields will still load.');
+      return;
+    }
+    if (window.location.protocol === 'file:') {
+      setCompaniesHouseStatus('API key saved. Serve this page from a Companies House-approved web origin to enable live enrichment.');
+      return;
+    }
+    setCompaniesHouseStatus('API key saved. New fetches will enrich matching companies when this origin is allowed in your Companies House app.');
+  }
+
+  $companiesHouseApiKey.val(settings.companiesHouseApiKey || '');
+  refreshCompaniesHouseStatus();
+
+  $companiesHouseApiKey.on('input', function() {
+    settings.companiesHouseApiKey = this.value.trim();
+    saveSettings(settings);
+    refreshCompaniesHouseStatus();
+  });
+
+  // ── Fetch Delay Slider ───────────────────────────────────
+  $fetchDelay.val(settings.fetchDelay);
+  $delayValue.text(settings.fetchDelay + 'ms');
+
+  $fetchDelay.on('input', function() {
+    const val = parseInt(this.value, 10);
+    $delayValue.text(val + 'ms');
+    settings.fetchDelay = val;
+    saveSettings(settings);
+  });
+
+  // ── Clear All Data ───────────────────────────────────────
+  $clearAllData.on('click', function() {
+    if (confirm('Are you sure you want to delete ALL stored Gazette data? This cannot be undone.')) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(COMPANIES_HOUSE_CACHE_KEY);
+      localStorage.removeItem(COLUMN_WIDTHS_KEY);
+      localStorage.removeItem(LAST_UPDATED_KEY);
+      companiesHouseCache = {};
+      columnWidths = {};
+      dataTable.clear().draw();
+      $('#statUpdated').text('Never');
+      updateStats([]);
+      console.log('All data cleared.');
+    }
+  });
+
+  // ── Set Default Dates ────────────────────────────────────
+  const today = dayjs().format('YYYY-MM-DD');
+  $startDate.val(today);
+  $endDate.val(today);
+
+  // ── Initialize DataTable ─────────────────────────────────
+  function renderDateCell(data, type) {
+    if (type === 'sort' || type === 'type') {
+      var d = parseCalendarDateValue(data);
+      return d && d.isValid() ? d.format('YYYYMMDD') : data;
+    }
+    return data;
+  }
+
+  const storedData = loadData();
+
+  const dataTable = $('#gazetteTable').DataTable({
+    data: storedData,
+    columns: [
+      {
+        title: 'Publication Date',
+        data: COL.PUB_DATE,
+        render: renderDateCell
+      },
+      { title: 'Company Name', data: COL.COMPANY_NAME },
+      { title: 'DBA/FKA/AKA', data: COL.TRADING_NAME },
+      {
+        title: 'URL Full Notice',
+        data: COL.URL_NOTICE,
+        render: function(data) {
+          if (!data) return '';
+          return '<a class="notice-link" href="' + data + '" target="_blank" rel="noopener">' + data + '</a>';
+        }
+      },
+      { title: 'Type of Corporate Insolvency', data: COL.TYPE },
+      { title: 'Notice ID', data: COL.NOTICE_ID },
+      {
+        title: 'Company Number',
+        data: COL.COMPANY_NUM,
+        render: function(data) {
+          if (!data) return '';
+          return data + ' <a class="crm-lookup-link" href="#" onclick="window.crmLookup(\'' + data.replace(/'/g, "\\'") + '\'); return false;" title="Lookup in CRM NatReg">&#x1F50D;</a>';
+        }
+      },
+      {
+        title: 'URL Company Number',
+        data: COL.URL_COMPANY,
+        render: function(data) {
+          if (!data) return '';
+          return '<a class="notice-link" href="' + data + '" target="_blank" rel="noopener">' + data + '</a>';
+        }
+      },
+      { title: 'Court Name', data: COL.COURT_NAME },
+      { title: 'Court Number', data: COL.COURT_NUM },
+      { title: 'Nature of Business', data: COL.NATURE_BIZ },
+      { title: 'Registered Office', data: COL.REG_OFFICE },
+      { title: 'Principal Trading Address', data: COL.PRINCIPAL_ADDR },
+      {
+        title: 'Date of Appointment',
+        data: COL.DATE_APPT,
+        render: renderDateCell
+      },
+      { title: 'Important Message', data: 19 },
+      {
+        title: 'Incorporated On',
+        data: COL.INCORPORATED_ON,
+        render: renderDateCell
+      },
+      { title: 'Nature of Business (SIC)', data: COL.SIC_CODES }
+    ],
+    order: [[0, 'desc']],   // Publication Date descending
+    pageLength: 50,
+    lengthMenu: [10, 25, 50, 100, 250],
+    scrollX: true,
+    autoWidth: false,
+    colReorder: true,
+    dom: 'Blfrtip',
+    buttons: [
+      {
+        extend: 'colvis',
+        text: 'Column Visibility',
+        className: 'dt-button'
+      }
+    ],
+    columnDefs: [
+      // Default hidden columns for readability
+      { visible: false, targets: [5, 7, 15, 16] },
+      // Max widths for long-text columns
+      { width: '95px', targets: [0, 5, 6, 13, 15] },
+      { width: '220px', targets: [1, 2, 8, 10, 11, 12, 16] },
+      { width: '260px', targets: [3, 7] },
+      { width: '140px', targets: [4] },
+      { width: '120px', targets: [9] },
+      { width: '360px', targets: [14] },
+      {
+        // Company Name, DBA/FKA/AKA, and Important Message: show full text
+        targets: [1, 2, 14],
+        createdCell: function(td, cellData) {
+          td.style.whiteSpace = 'normal';
+          td.style.overflowWrap = 'break-word';
+          td.style.wordBreak = 'break-word';
+          if (cellData != null) td.title = String(cellData);
+        }
+      },
+      {
+        targets: '_all',
+        createdCell: function(td, cellData) {
+          if (cellData != null) td.title = String(cellData);
+        }
+      }
+    ],
+    language: {
+      emptyTable: 'No records loaded. Use the fetch controls above to retrieve Gazette notices.',
+      info: 'Showing _START_ to _END_ of _TOTAL_ records',
+      infoEmpty: 'No records available',
+      search: 'Search:'
+    }
+  });
+
+  // ── Update Summary Stats ─────────────────────────────────
+  var MIN_COLUMN_WIDTH = 80;
+  var activeColumnResize = null;
+  var dragScrollState = null;
+  var resizeAnimationFrame = null;
+  var syncingTopScroll = false;
+  var syncingBottomScroll = false;
+  var syncingFloatingScroll = false;
+
+  function getDataTableWrapper() {
+    return $('#gazetteTable').closest('.dataTables_wrapper');
+  }
+
+  function getTableScrollBody() {
+    var $body = getDataTableWrapper().find('.dataTables_scrollBody');
+    return $body.length ? $body : $();
+  }
+
+  function getVisibleHeaderCells() {
+    return getDataTableWrapper().find('.dataTables_scrollHead thead th:visible');
+  }
+
+  function getVisibleColumnDataIndex(visibleIndex) {
+    return dataTable.column(visibleIndex + ':visible').index();
+  }
+
+  function setVisibleColumnWidth(visibleIndex, width) {
+    var safeWidth = Math.max(MIN_COLUMN_WIDTH, Math.round(width || 0));
+    var nth = visibleIndex + 1;
+    var $wrapper = getDataTableWrapper();
+
+    $wrapper.find('.dataTables_scrollHead table colgroup col:nth-child(' + nth + '), .dataTables_scrollBody table colgroup col:nth-child(' + nth + ')')
+      .css({ width: safeWidth + 'px', minWidth: safeWidth + 'px', maxWidth: safeWidth + 'px' });
+
+    $wrapper.find('.dataTables_scrollHead thead th:nth-child(' + nth + ')')
+      .css({ width: safeWidth + 'px', minWidth: safeWidth + 'px', maxWidth: safeWidth + 'px' });
+  }
+
+  function scheduleResizePaint() {
+    if (resizeAnimationFrame) return;
+    resizeAnimationFrame = window.requestAnimationFrame(function() {
+      resizeAnimationFrame = null;
+      if (!activeColumnResize) return;
+      setVisibleColumnWidth(activeColumnResize.visibleIndex, columnWidths[activeColumnResize.dataIndex]);
+      syncTopTableScrollbar();
+    });
+  }
+
+  function applyStoredColumnWidths() {
+    getVisibleHeaderCells().each(function(visibleIndex) {
+      var dataIndex = getVisibleColumnDataIndex(visibleIndex);
+      if (columnWidths[dataIndex]) {
+        setVisibleColumnWidth(visibleIndex, columnWidths[dataIndex]);
+      }
+    });
+    syncTopTableScrollbar();
+  }
+
+  function refreshColumnResizeHandles() {
+    getVisibleHeaderCells().each(function() {
+      var $th = $(this);
+      $th.addClass('resizable-column');
+      $th.find('.col-resize-handle').remove();
+      $th.append('<span class="col-resize-handle" title="Drag to resize column" aria-hidden="true"></span>');
+    });
+    applyStoredColumnWidths();
+  }
+
+  function canStartHorizontalDrag(target) {
+    var $target = $(target);
+    if ($target.closest('a, button, input, textarea, select, label, .col-resize-handle, .dt-button, .paginate_button').length) return false;
+    if ($target.closest('.dataTables_filter, .dataTables_length, .dt-buttons').length) return false;
+    return true;
+  }
+
+  var DRAG_THRESHOLD = 5; // pixels of movement before drag activates
+
+  function startHorizontalDrag($el, event) {
+    if (event.which !== 1 || !canStartHorizontalDrag(event.target) || activeColumnResize) return;
+    // Don't preventDefault yet — allow text selection until threshold is exceeded
+    dragScrollState = {
+      $el: $el,
+      startX: event.pageX,
+      startScrollLeft: $el.scrollLeft(),
+      activated: false  // becomes true after mouse moves past threshold
+    };
+  }
+
+  function syncTopTableScrollbar() {
+    var $body = getTableScrollBody();
+    if (!$body.length) return;
+
+    var bodyEl = $body[0];
+    var scrollWidth = bodyEl.scrollWidth || 0;
+    var clientWidth = bodyEl.clientWidth || 0;
+    var parentEl = $tableScrollTop.parent()[0];
+
+    if (parentEl) {
+      var bodyRect = bodyEl.getBoundingClientRect();
+      var parentRect = parentEl.getBoundingClientRect();
+      $tableScrollTop.css({
+        width: clientWidth + 'px',
+        marginLeft: Math.max(0, Math.round(bodyRect.left - parentRect.left)) + 'px'
+      });
+    }
+
+    $tableScrollSync.width(scrollWidth);
+
+    if (scrollWidth > clientWidth + 1) {
+      $tableScrollTop.show();
+      $tableScrollTop.scrollLeft(bodyEl.scrollLeft);
+    } else {
+      $tableScrollTop.hide();
+    }
+
+    // --- Floating bottom scrollbar ---
+    var hasOverflow = scrollWidth > clientWidth + 1;
+    if (hasOverflow) {
+      var bodyRect2 = bodyEl.getBoundingClientRect();
+      var viewportHeight = window.innerHeight;
+      // Show the floating bar only when the native scrollbar is below the viewport
+      var nativeBarVisible = bodyRect2.bottom <= viewportHeight + 5;
+      if (nativeBarVisible) {
+        $tableScrollBottom.hide();
+      } else {
+        $tableScrollBottom.css({
+          left: Math.round(bodyRect2.left) + 'px',
+          width: Math.round(bodyRect2.width) + 'px',
+          right: 'auto'
+        }).show();
+        $tableScrollBottomInner.width(scrollWidth);
+        if (!syncingFloatingScroll) {
+          $tableScrollBottom.scrollLeft(bodyEl.scrollLeft);
+        }
+      }
+    } else {
+      $tableScrollBottom.hide();
+    }
+  }
+
+  function bindTopTableScrollbar() {
+    var $body = getTableScrollBody();
+    if (!$body.length) return;
+
+    $body.addClass('drag-scroll-enabled');
+    $body.off('scroll.topSync').on('scroll.topSync', function() {
+      if (syncingTopScroll || syncingFloatingScroll) return;
+      syncingBottomScroll = true;
+      $tableScrollTop.scrollLeft(this.scrollLeft);
+      $tableScrollBottom.scrollLeft(this.scrollLeft);
+      syncingBottomScroll = false;
+    });
+
+    syncTopTableScrollbar();
+  }
+
+  $tableScrollTop.on('scroll', function() {
+    var $body = getTableScrollBody();
+    if (!$body.length || syncingBottomScroll || syncingFloatingScroll) return;
+    syncingTopScroll = true;
+    $body.scrollLeft(this.scrollLeft);
+    $tableScrollBottom.scrollLeft(this.scrollLeft);
+    syncingTopScroll = false;
+  });
+
+  // Floating bottom scrollbar: sync scroll position back to table body + top bar
+  $tableScrollBottom.on('scroll', function() {
+    var $body = getTableScrollBody();
+    if (!$body.length || syncingBottomScroll || syncingTopScroll) return;
+    syncingFloatingScroll = true;
+    $body.scrollLeft(this.scrollLeft);
+    $tableScrollTop.scrollLeft(this.scrollLeft);
+    syncingFloatingScroll = false;
+  });
+
+  $tableScrollTop.on('mousedown', function(event) {
+    startHorizontalDrag($tableScrollTop, event);
+  });
+
+  $tableScrollBottom.on('mousedown', function(event) {
+    startHorizontalDrag($tableScrollBottom, event);
+  });
+
+  $(document).on('mousedown', '.table-card', function(event) {
+    var $body = getTableScrollBody();
+    if ($body.length) startHorizontalDrag($body, event);
+  });
+
+  getDataTableWrapper().on('mousedown', '.dataTables_scrollHead .col-resize-handle', function(event) {
+    if (event.which !== 1) return;
+    var $th = $(this).closest('th');
+    var visibleIndex = $th.index();
+    activeColumnResize = {
+      visibleIndex: visibleIndex,
+      dataIndex: getVisibleColumnDataIndex(visibleIndex),
+      startX: event.pageX,
+      startWidth: $th.outerWidth()
+    };
+    $('body').addClass('column-resizing');
+    event.preventDefault();
+    event.stopPropagation();
+  });
+
+  $(document).on('mousemove', function(event) {
+    if (activeColumnResize) {
+      var newWidth = activeColumnResize.startWidth + (event.pageX - activeColumnResize.startX);
+      columnWidths[activeColumnResize.dataIndex] = Math.max(MIN_COLUMN_WIDTH, Math.round(newWidth));
+      scheduleResizePaint();
+      event.preventDefault();
+      return;
+    }
+
+    if (dragScrollState) {
+      var dx = event.pageX - dragScrollState.startX;
+      if (!dragScrollState.activated) {
+        // Only activate drag after passing the movement threshold
+        if (Math.abs(dx) < DRAG_THRESHOLD) return;
+        dragScrollState.activated = true;
+        // Clear any accidental text selection from the initial click
+        if (window.getSelection) window.getSelection().removeAllRanges();
+        $('body').addClass('horizontal-dragging');
+        var $el = dragScrollState.$el;
+        if ($el.is($tableScrollTop) || $el.is($tableScrollBottom)) {
+          $el.addClass('dragging');
+        }
+      }
+      dragScrollState.$el.scrollLeft(dragScrollState.startScrollLeft - dx);
+      event.preventDefault();
+    }
+  });
+
+  $(document).on('mouseup', function() {
+    if (activeColumnResize) {
+      if (resizeAnimationFrame) {
+        window.cancelAnimationFrame(resizeAnimationFrame);
+        resizeAnimationFrame = null;
+      }
+      setVisibleColumnWidth(activeColumnResize.visibleIndex, columnWidths[activeColumnResize.dataIndex]);
+      saveColumnWidths(columnWidths);
+      activeColumnResize = null;
+      $('body').removeClass('column-resizing');
+      dataTable.columns.adjust();
+      refreshColumnResizeHandles();
+    }
+
+    if (dragScrollState) {
+      if (dragScrollState.activated) {
+        dragScrollState.$el.removeClass('dragging');
+        $tableScrollTop.removeClass('dragging');
+        $tableScrollBottom.removeClass('dragging');
+        $('body').removeClass('horizontal-dragging');
+      }
+      dragScrollState = null;
+    }
+  });
+
+  dataTable.on('draw.dt column-visibility.dt column-reorder.dt', function() {
+    setTimeout(function() {
+      bindTopTableScrollbar();
+      refreshColumnResizeHandles();
+    }, 0);
+  });
+
+  $(window).on('resize scroll', function() {
+    syncTopTableScrollbar();
+  });
+
+  setTimeout(function() {
+    bindTopTableScrollbar();
+    refreshColumnResizeHandles();
+  }, 0);
+
+  function updateStats(data) {
+    const total = data.length;
+    $('#statTotal').text(total.toLocaleString());
+
+    // Records today
+    const todayMDY = toMDY(dayjs());
+    const todayCount = data.filter(function(row) { return row[COL.PUB_DATE] === todayMDY; }).length;
+    $('#statToday').text(todayCount.toLocaleString());
+
+    // Date range — parse M/D/YYYY dates to sort chronologically
+    if (total > 0) {
+      const parsed = data.map(function(row) { return row[COL.PUB_DATE]; }).filter(Boolean)
+        .map(function(d) { return parseCalendarDateValue(d); })
+        .filter(function(d) { return d && d.isValid(); })
+        .sort(function(a, b) { return a.valueOf() - b.valueOf(); });
+      const earliest = parsed.length ? toMDY(parsed[0]) : '--';
+      const latest = parsed.length ? toMDY(parsed[parsed.length - 1]) : '--';
+      $('#statRange').text(earliest + ' \u2192 ' + latest);
+    } else {
+      $('#statRange').text('--');
+    }
+
+    // Export count
+    const filtered = dataTable.rows({ search: 'applied' }).count();
+    $exportCount.text(filtered + ' of ' + total + ' records (filtered view)');
+  }
+
+  // Run initial stats update
+  updateStats(storedData);
+
+  // Update export count when search/filter changes
+  dataTable.on('search.dt', function() {
+    const total = dataTable.rows().count();
+    const filtered = dataTable.rows({ search: 'applied' }).count();
+    $exportCount.text(filtered + ' of ' + total + ' records (filtered view)');
+  });
+
+  // Check last updated
+  (function() {
+    try {
+      const lastRun = localStorage.getItem(LAST_UPDATED_KEY);
+      if (lastRun) {
+        $('#statUpdated').text(lastRun);
+      }
+    } catch (e) { /* ignore */ }
+  })();
+
+  // ── Progress Helpers ─────────────────────────────────────
+  function showProgress(text, pct) {
+    $progressArea.addClass('visible');
+    $progressText.html(text);
+    $progressFill.css('width', Math.min(100, Math.max(0, pct)) + '%');
+  }
+
+  function hideProgress() {
+    $progressArea.removeClass('visible');
+    $progressFill.css('width', '0%');
+  }
+
+  // ── Fetch State ──────────────────────────────────────────
+  let fetchCancelled = false;
+  let fetchInProgress = false;
+
+  function setFetchButtons(disabled) {
+    $fetchToday.prop('disabled', disabled);
+    $fetchRange.prop('disabled', disabled);
+    $fetchNew.prop('disabled', disabled);
+  }
+
+  // ── CORS Proxy ──────────────────────────────────────────
+  // Browsers block cross-origin fetches from file:// and some origins.
+  // We try direct first, then cycle through CORS proxies.
+  var CORS_PROXIES = [
+    function(u) { return 'https://corsproxy.io/?' + encodeURIComponent(u); },
+    function(u) { return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u); },
+    function(u) { return 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u); }
+  ];
+  var corsMode = 'unknown'; // 'unknown' | 'direct' | proxy index (0,1,2)
+
+  async function fetchWithCors(url) {
+    // If direct works, use it
+    if (corsMode === 'direct') {
+      var resp = await fetch(url);
+      if (resp.ok || (resp.status >= 300 && resp.status < 400)) return resp;
+      // Direct gave a server error — maybe transient, try proxies
+    }
+
+    // If a proxy is known good, try it first
+    if (typeof corsMode === 'number') {
+      try {
+        var proxyResp = await fetch(CORS_PROXIES[corsMode](url));
+        if (proxyResp.ok) return proxyResp;
+      } catch (e) { /* fall through to full scan */ }
+      // Preferred proxy failed — reset and scan all
+      corsMode = 'unknown';
+    }
+
+    // Unknown or recovery: try direct then each proxy
+    if (corsMode === 'unknown' || corsMode === 'direct') {
+      try {
+        var directResp = await fetch(url);
+        if (directResp.ok) { corsMode = 'direct'; return directResp; }
+      } catch (e) {
+        console.warn('Direct fetch failed (CORS likely):', e.message);
+      }
+    }
+
+    // Try each proxy in order
+    for (var i = 0; i < CORS_PROXIES.length; i++) {
+      try {
+        var pResp = await fetch(CORS_PROXIES[i](url));
+        if (pResp.ok) {
+          corsMode = i;
+          console.log('Using CORS proxy #' + i);
+          return pResp;
+        }
+        console.warn('CORS proxy #' + i + ' returned HTTP ' + pResp.status);
+      } catch (e) {
+        console.warn('CORS proxy #' + i + ' failed:', e.message);
+      }
+    }
+
+    // All proxies failed — return last attempt so caller sees the error
+    throw new Error('All fetch methods failed (direct + ' + CORS_PROXIES.length + ' proxies). The Gazette may be temporarily unavailable.');
+  }
+
+  // ── Helpers ────────────────────────────────────────────
+  function delay(ms) {
+    return new Promise(function(resolve) { setTimeout(resolve, ms); });
+  }
+
+  // ── Proper Case Conversion ─────────────────────────────
+  var SMALL_WORDS = {'of':1,'the':1,'and':1,'for':1,'in':1,'on':1,'at':1,'to':1,'by':1,'a':1,'an':1};
+  var BIZ_SUFFIXES = {
+    'ltd':'Ltd','llp':'Llp','plc':'Plc','limited':'Limited','group':'Group',
+    'holdings':'Holdings','inc':'Inc','cic':'Cic','llc':'Llc','co':'Co',
+    'uk':'UK','usa':'USA'
+  };
+
+  function toProperCase(str) {
+    if (!str) return '';
+    return str.toLowerCase().split(/\s+/).map(function(word, idx) {
+      if (!word) return '';
+      // Check business suffixes first
+      var lower = word.replace(/[^a-z]/g, '');
+      if (BIZ_SUFFIXES[lower]) {
+        // Preserve any punctuation around the word
+        return word.replace(/[a-z]+/i, BIZ_SUFFIXES[lower]);
+      }
+      // Small words stay lowercase unless first word
+      if (idx > 0 && SMALL_WORDS[lower]) return word;
+      // Capitalize first letter
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    }).join(' ');
+  }
+
+  function toMDY(d) {
+    return (d.month() + 1) + '/' + d.date() + '/' + d.year();
+  }
+
+  function buildDayjsFromParts(year, month, day) {
+    // Use noon local time to prevent timezone shifts at midnight UTC
+    // (e.g. "2026-03-31" parsed as UTC midnight becomes March 30 in US timezones)
+    var iso = String(year) + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0') + 'T12:00:00';
+    var parsed = dayjs(iso);
+    return parsed.isValid() ? parsed : null;
+  }
+
+  function parseCalendarDateValue(value) {
+    var raw = cleanText(value);
+    if (!raw) return null;
+
+    var mdyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (mdyMatch) return buildDayjsFromParts(mdyMatch[3], mdyMatch[1], mdyMatch[2]);
+
+    // Preserve the literal calendar date from Gazette/Companies House ISO strings.
+    // Use lookahead instead of \b to handle "2026-03-27T00:00:00" where T follows the day.
+    var isoMatch = raw.match(/(\d{4})-(\d{2})-(\d{2})(?=\b|T)/);
+    if (isoMatch) return buildDayjsFromParts(isoMatch[1], isoMatch[2], isoMatch[3]);
+
+    var longDateMatch = raw.match(/\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b/i);
+    if (longDateMatch) {
+      var monthNames = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+      var mon = monthNames[longDateMatch[2].toLowerCase()];
+      if (mon) return buildDayjsFromParts(longDateMatch[3], mon, longDateMatch[1]);
+    }
+
+    var shortMonthMatch = raw.match(/\b(\d{1,2})-([A-Za-z]{3})-(\d{4})\b/);
+    if (shortMonthMatch) {
+      var shortMonthNames = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+      var sMon = shortMonthNames[shortMonthMatch[2].toLowerCase()];
+      if (sMon) return buildDayjsFromParts(shortMonthMatch[3], sMon, shortMonthMatch[1]);
+    }
+
+    // Fallback: parse with native Date and extract UTC parts to avoid timezone shift
+    var nativeDate = new Date(raw);
+    if (!isNaN(nativeDate.getTime()) && nativeDate.getUTCFullYear() > 2000) {
+      return buildDayjsFromParts(nativeDate.getUTCFullYear(), nativeDate.getUTCMonth() + 1, nativeDate.getUTCDate());
+    }
+
+    return null;
+  }
+
+  function normalizeDateStr(raw) {
+    if (!raw) return '';
+    raw = raw.replace(/\s+/g, ' ').trim();
+    raw = raw.replace(/\s*(Name|Joint|Administrator|Signed|For further).*$/i, '');
+    var parsed = parseCalendarDateValue(raw);
+    if (parsed) return toMDY(parsed);
+    return raw.trim();
+  }
+
+  function normalizeStoredDate(val) {
+    if (!val) return '';
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) return val;
+    var parsed = parseCalendarDateValue(val);
+    if (parsed) return toMDY(parsed);
+    return (val + '').trim();
+  }
+
+  function normalizeCompanyNumber(companyNumber) {
+    return (companyNumber || '').toString().trim().replace(/\s+/g, '').toUpperCase();
+  }
+
+  function normalizeCompanyLookupNumber(companyNumber) {
+    var normalized = normalizeCompanyNumber(companyNumber);
+    if (!normalized) return '';
+    if (/^\d+$/.test(normalized)) return normalized.padStart(8, '0');
+    return normalized;
+  }
+
+  function buildCompanyUrl(companyNumber) {
+    var normalized = normalizeCompanyNumber(companyNumber);
+    return normalized ? 'https://www.thegazette.co.uk/company/' + encodeURIComponent(normalized) : '';
+  }
+
+  function looksLikeUrl(value) {
+    return /^https?:\/\//i.test(value || '');
+  }
+
+  function cleanText(value) {
+    return (value || '').toString().replace(/\s+/g, ' ').trim();
+  }
+
+  function isTruncatedText(value) {
+    return /\u2026|\.\.\.$/.test(cleanText(value));
+  }
+
+  function humanJoin(items) {
+    var cleaned = (items || []).map(cleanText).filter(Boolean);
+    if (cleaned.length === 0) return '';
+    if (cleaned.length === 1) return cleaned[0];
+    if (cleaned.length === 2) return cleaned[0] + ' and ' + cleaned[1];
+    return cleaned.slice(0, -1).join(', ') + ', and ' + cleaned[cleaned.length - 1];
+  }
+
+  function extractAddressLabel(address) {
+    if (!address) return '';
+    if (Array.isArray(address)) return extractAddressLabel(address[0]);
+    if (typeof address === 'string') return cleanText(address);
+    return cleanText(address.label || address['@label'] || '');
+  }
+
+  function extractOrganisationNameFallback(rawJsonText, companyName) {
+    var raw = rawJsonText || '';
+    var company = cleanText(companyName).toUpperCase();
+    var matches = raw.match(/"organisationName":"([^"]+)"/g) || [];
+
+    for (var i = 0; i < matches.length; i++) {
+      var name = matches[i].replace(/^"organisationName":"|"$|\\+/g, '');
+      name = cleanText(name).replace(/^of\s+/i, '').replace(/[,\s]+$/, '');
+      if (!name) continue;
+      if (name.toUpperCase() === company) continue;
+      return name;
+    }
+
+    return '';
+  }
+
+  function formatAdministratorSummary(administrators) {
+    var list = Array.isArray(administrators) ? administrators : (administrators ? [administrators] : []);
+    var names = [];
+    var firms = [];
+    var parts = [];
+
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i] || {};
+      var name = cleanText(item.name || [item.firstName, item.givenName, item.familyName].filter(Boolean).join(' '));
+      var firm = cleanText(item.hasOrganisationMember && item.hasOrganisationMember.organisationName);
+      if (name) names.push(name);
+      if (firm) firms.push(firm);
+      if (name && firm) parts.push(name + ' of ' + firm);
+      else if (name) parts.push(name);
+    }
+
+    firms = Array.from(new Set(firms));
+    if (names.length && firms.length === 1) {
+      return humanJoin(Array.from(new Set(names))) + ' of ' + firms[0];
+    }
+    return humanJoin(parts);
+  }
+
+  function generateImportantMessage(row) {
+    var dateAppt = cleanText(normalizeStoredDate(row[COL.DATE_APPT]));
+    var companyName = cleanText(row[COL.COMPANY_NAME]);
+    var courtName = cleanText(row[COL.COURT_NAME]).replace(/^In the\s+/i, '').replace(/[,\s]+$/, '');
+    var courtNum = cleanText(row[COL.COURT_NUM]);
+    var admins = cleanText(row[COL.ADMINS]).replace(/[,\s]+$/, '');
+    var parts = [];
+
+    if (dateAppt && companyName && courtName) {
+      parts.push('On ' + dateAppt + ', ' + companyName + ' was placed into Administration with ' + (/^the\b/i.test(courtName) ? courtName : 'the ' + courtName) + '.');
+    } else if (companyName && courtName) {
+      parts.push(companyName + ' was placed into Administration with ' + (/^the\b/i.test(courtName) ? courtName : 'the ' + courtName) + '.');
+    } else if (companyName) {
+      parts.push(companyName + ' was placed into Administration.');
+    }
+
+    if (courtNum) {
+      parts.push('Court Number: ' + courtNum + '.');
+    }
+
+    if (admins) {
+      var plural = / and |;|, .* and /i.test(admins);
+      parts.push(admins + ' ' + (plural ? 'were' : 'was') + ' appointed as the ' + (plural ? 'Administrators' : 'Administrator') + ' of the Company.');
+    }
+
+    return parts.join(' ').trim();
+  }
+
+  function syncComputedRowFields(row) {
+    if (!Array.isArray(row)) return row;
+    while (row.length <= COL.IMPORTANT_MSG) row.push('');
+
+    row[COL.PUB_DATE] = normalizeStoredDate(row[COL.PUB_DATE]);
+    row[COL.COMPANY_NAME] = cleanText(row[COL.COMPANY_NAME]);
+    if (row[COL.COMPANY_NAME] && row[COL.COMPANY_NAME] === row[COL.COMPANY_NAME].toUpperCase()) {
+      row[COL.COMPANY_NAME] = toProperCase(row[COL.COMPANY_NAME]);
+    }
+    row[COL.COMPANY_NUM] = normalizeCompanyNumber(row[COL.COMPANY_NUM]);
+    row[COL.URL_COMPANY] = row[COL.URL_COMPANY] || buildCompanyUrl(row[COL.COMPANY_NUM]);
+    row[COL.COURT_NAME] = cleanText(row[COL.COURT_NAME]);
+    row[COL.COURT_NUM] = cleanText(row[COL.COURT_NUM]);
+    row[COL.TRADING_NAME] = cleanText(row[COL.TRADING_NAME]);
+    row[COL.NATURE_BIZ] = cleanText(row[COL.NATURE_BIZ]);
+    row[COL.REG_OFFICE] = cleanText(row[COL.REG_OFFICE]);
+    row[COL.PRINCIPAL_ADDR] = cleanText(row[COL.PRINCIPAL_ADDR]);
+    row[COL.DATE_APPT] = normalizeStoredDate(row[COL.DATE_APPT]);
+    row[COL.ADMINS] = cleanText(row[COL.ADMINS]);
+    row[COL.CH_REG_ADDRESS] = cleanText(row[COL.CH_REG_ADDRESS]);
+    row[COL.COMPANY_TYPE] = cleanText(row[COL.COMPANY_TYPE]);
+    row[COL.INCORPORATED_ON] = normalizeStoredDate(row[COL.INCORPORATED_ON]);
+    row[COL.SIC_CODES] = cleanText(row[COL.SIC_CODES]);
+    row[COL.IMPORTANT_MSG] = generateImportantMessage(row);
+    return row;
+  }
+
+  function normalizeStoredRow(row) {
+    var normalized;
+    if (!Array.isArray(row)) return null;
+
+    if (row.length >= 20) {
+      normalized = row.slice(0, 20);
+    } else if (row.length === 19) {
+      normalized = row.slice(0, 19).concat(['']);
+    } else if (row.length === 15) {
+      if (looksLikeUrl(row[6])) {
+        normalized = [
+          row[0] || '',
+          row[1] || '',
+          row[2] || '',
+          row[3] || '',
+          row[4] || '',
+          row[5] || '',
+          row[6] || '',
+          row[7] || '',
+          row[8] || '',
+          row[9] || '',
+          row[10] || '',
+          row[11] || '',
+          '',
+          row[12] || '',
+          row[13] || '',
+          '',
+          '',
+          '',
+          '',
+          row[14] || ''
+        ];
+      } else {
+        normalized = [
+          row[0] || '',
+          row[1] || '',
+          row[2] || '',
+          row[3] || '',
+          row[4] || '',
+          row[5] || '',
+          buildCompanyUrl(row[5]),
+          row[6] || '',
+          row[7] || '',
+          row[8] || '',
+          row[9] || '',
+          row[10] || '',
+          '',
+          row[11] || '',
+          row[12] || '',
+          '',
+          '',
+          '',
+          '',
+          row[13] || row[14] || ''
+        ];
+      }
+    } else if (row.length === 14) {
+      normalized = [
+        row[0] || '',
+        row[1] || '',
+        row[2] || '',
+        row[3] || '',
+        row[4] || '',
+        row[5] || '',
+        buildCompanyUrl(row[5]),
+        row[6] || '',
+        row[7] || '',
+        row[8] || '',
+        row[9] || '',
+        row[10] || '',
+        '',
+        row[11] || '',
+        row[12] || '',
+        '',
+        '',
+        '',
+        '',
+        row[13] || ''
+      ];
+    } else {
+      return null;
+    }
+
+    for (var j = 0; j < normalized.length; j++) {
+      normalized[j] = normalized[j] == null ? '' : normalized[j];
+    }
+
+    return syncComputedRowFields(normalized);
+  }
+
+  function rowsEqual(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if ((a[i] || '') !== (b[i] || '')) return false;
+    }
+    return true;
+  }
+
+  function shouldPreferIncomingValue(index, currentValue, incomingValue) {
+    var current = cleanText(currentValue);
+    var next = cleanText(incomingValue);
+    if (!next) return false;
+    if (!current) return true;
+    if (current === next) return false;
+
+    if (index === COL.COMPANY_NUM) {
+      return next.length > current.length;
+    }
+    if (index === COL.COMPANY_NAME) {
+      return current === current.toUpperCase() && next !== next.toUpperCase();
+    }
+    if (index === COL.URL_COMPANY) {
+      return looksLikeUrl(next) && !looksLikeUrl(current);
+    }
+    if (index === COL.PUB_DATE || index === COL.DATE_APPT || index === COL.COURT_NUM || index === COL.INCORPORATED_ON) {
+      return isTruncatedText(current) || next.length >= current.length;
+    }
+    if (index === COL.COURT_NAME || index === COL.TRADING_NAME || index === COL.NATURE_BIZ || index === COL.REG_OFFICE || index === COL.PRINCIPAL_ADDR ||
+        index === COL.ADMINS || index === COL.CH_REG_ADDRESS || index === COL.SIC_CODES || index === COL.IMPORTANT_MSG) {
+      return isTruncatedText(current) || next.length > current.length;
+    }
+    return false;
+  }
+
+  function mergeStoredRows(existingRow, incomingRow) {
+    var merged = normalizeStoredRow(existingRow);
+    var next = normalizeStoredRow(incomingRow);
+    var changed = false;
+    if (!merged || !next) return { row: next || merged, changed: false };
+
+    for (var i = 0; i < next.length; i++) {
+      if (shouldPreferIncomingValue(i, merged[i], next[i])) {
+        merged[i] = next[i];
+        changed = true;
+      }
+    }
+
+    syncComputedRowFields(merged);
+    return { row: merged, changed: changed };
+  }
+
+  function buildRegisteredAddressString(address) {
+    return [
+      address.care_of,
+      address.po_box,
+      address.premises,
+      address.address_line_1,
+      address.address_line_2,
+      address.locality,
+      address.region,
+      address.postal_code,
+      address.country
+    ].filter(Boolean).join(', ');
+  }
+
+  function formatCompanyType(type) {
+    return (type || '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function applyCompaniesHouseEnrichment(row, enrichment) {
+    if (!row) return row;
+    row[COL.COMPANY_NUM] = normalizeCompanyNumber(row[COL.COMPANY_NUM]);
+    row[COL.URL_COMPANY] = row[COL.URL_COMPANY] || buildCompanyUrl(row[COL.COMPANY_NUM]);
+
+    if (!enrichment) return row;
+
+    row[COL.CH_REG_ADDRESS] = enrichment.registeredAddress || row[COL.CH_REG_ADDRESS] || '';
+    row[COL.COMPANY_TYPE] = enrichment.companyType || row[COL.COMPANY_TYPE] || '';
+    row[COL.INCORPORATED_ON] = normalizeStoredDate(enrichment.incorporatedOn || row[COL.INCORPORATED_ON] || '');
+    row[COL.SIC_CODES] = enrichment.sicCodes || row[COL.SIC_CODES] || '';
+    return syncComputedRowFields(row);
+  }
+
+  function applyGazetteNoticeDetail(row, detailJson) {
+    var topic = detailJson && detailJson.result && detailJson.result.primaryTopic;
+    var about = topic && topic.isAbout ? topic.isAbout : {};
+    var company = about.company || {};
+    var courtCase = about.hasCourtCase || {};
+    var court = courtCase.hasCourt || {};
+    var administrators = about.administrator || [];
+    var rawJson = detailJson && detailJson.__raw ? detailJson.__raw : '';
+
+    if (topic && topic.hasPublicationDate) {
+      row[COL.PUB_DATE] = topic.hasPublicationDate;
+    }
+    if (company && company.organisationName) {
+      row[COL.COMPANY_NAME] = toProperCase(company.organisationName);
+    }
+    if (company && company.companyNumber) {
+      row[COL.COMPANY_NUM] = company.companyNumber;
+    }
+    if (court && court.courtName) {
+      row[COL.COURT_NAME] = court.courtName;
+    }
+    if (courtCase && courtCase.caseCode) {
+      row[COL.COURT_NUM] = courtCase.caseCode;
+    } else if (courtCase && courtCase.caseNumber && courtCase.caseYear) {
+      row[COL.COURT_NUM] = 'No ' + cleanText(courtCase.caseNumber) + ' of ' + cleanText(courtCase.caseYear);
+    } else if (courtCase && courtCase.caseNumber) {
+      row[COL.COURT_NUM] = 'No ' + cleanText(courtCase.caseNumber);
+    }
+    if (company && company.natureOfBusiness) {
+      row[COL.NATURE_BIZ] = company.natureOfBusiness;
+    }
+    if (company && company.hasRegisteredOffice) {
+      row[COL.REG_OFFICE] = extractAddressLabel(company.hasRegisteredOffice);
+    }
+    if (company && company.hasPrincipalTradingAddress) {
+      row[COL.PRINCIPAL_ADDR] = extractAddressLabel(company.hasPrincipalTradingAddress);
+    }
+    if (about && about.dateOfAppointment) {
+      row[COL.DATE_APPT] = normalizeDateStr(about.dateOfAppointment);
+    }
+    // Collect all alias names: previousCompanyName, tradingName, tradingAs
+    var detailAliases = [];
+    if (company && company.previousCompanyName) {
+      var prev = Array.isArray(company.previousCompanyName) ? company.previousCompanyName : [company.previousCompanyName];
+      prev.forEach(function(n) { var c = cleanText(n); if (c) detailAliases.push(c); });
+    }
+    if (company && company.tradingName) {
+      var tn = Array.isArray(company.tradingName) ? company.tradingName : [company.tradingName];
+      tn.forEach(function(n) { var c = cleanText(n); if (c) detailAliases.push(c); });
+    }
+    if (company && (company.isTradingAs || company.tradingAs)) {
+      var taVal = company.isTradingAs || company.tradingAs;
+      var ta = Array.isArray(taVal) ? taVal : [taVal];
+      ta.forEach(function(n) { var c = cleanText(n); if (c) detailAliases.push(c); });
+    }
+    if (about && about.tradingName) {
+      var atn = Array.isArray(about.tradingName) ? about.tradingName : [about.tradingName];
+      atn.forEach(function(n) { var c = cleanText(n); if (c) detailAliases.push(c); });
+    }
+    if (detailAliases.length > 0) {
+      var existingTradingName = cleanText(row[COL.TRADING_NAME]);
+      var existingParts = existingTradingName ? existingTradingName.split(/\s*;\s*/) : [];
+      var seen = {};
+      existingParts.forEach(function(p) { seen[p.toUpperCase()] = true; });
+      detailAliases.forEach(function(a) {
+        if (!seen[a.toUpperCase()]) {
+          existingParts.push(a);
+          seen[a.toUpperCase()] = true;
+        }
+      });
+      row[COL.TRADING_NAME] = existingParts.join('; ');
+    }
+
+    var adminSummary = formatAdministratorSummary(administrators);
+    var firmFallback = extractOrganisationNameFallback(rawJson, company && company.organisationName);
+    if (adminSummary && firmFallback && !/\sof\s/i.test(adminSummary)) {
+      adminSummary += ' of ' + firmFallback;
+    }
+    if (adminSummary) {
+      row[COL.ADMINS] = adminSummary;
+    }
+
+    return syncComputedRowFields(row);
+  }
+
+  async function fetchGazetteNoticeDetail(noticeId) {
+    if (!noticeId) return null;
+    var url = 'https://www.thegazette.co.uk/notice/' + noticeId + '/data.json?view=linked-data';
+    var lastErr;
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        var resp = await fetchWithCors(url);
+        if (resp.ok) {
+          var text = await resp.text();
+          var parsed = JSON.parse(text);
+          parsed.__raw = text;
+          return parsed;
+        }
+        if (resp.status >= 500 && attempt < 2) {
+          corsMode = 'unknown';
+          await delay(1500);
+          continue;
+        }
+        throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
+      } catch (e) {
+        lastErr = e;
+        if (attempt < 2) { corsMode = 'unknown'; await delay(1500); }
+      }
+    }
+    throw lastErr || new Error('Failed to fetch notice ' + noticeId);
+  }
+
+  async function hydrateNoticesWithGazetteDetails(notices) {
+    var hydrated = [];
+    var fetchDelayMs = settings.fetchDelay || 750;
+
+    for (var i = 0; i < notices.length; i++) {
+      var row = normalizeStoredRow(notices[i]);
+      if (!row) continue;
+
+      if (fetchCancelled) {
+        hydrated.push(row);
+        continue;
+      }
+
+      showProgress(
+        'Reading notice details <strong>' + (i + 1) + '</strong> of <strong>' + notices.length + '</strong>...',
+        Math.round(((i + 1) / Math.max(1, notices.length)) * 100)
+      );
+
+      try {
+        var detailJson = await fetchGazetteNoticeDetail(row[COL.NOTICE_ID]);
+        if (detailJson) {
+          applyGazetteNoticeDetail(row, detailJson);
+        }
+      } catch (err) {
+        console.warn('Failed to read Gazette notice detail for ' + row[COL.NOTICE_ID] + ':', err);
+      }
+
+      hydrated.push(syncComputedRowFields(row));
+
+      if (i < notices.length - 1 && !fetchCancelled) {
+        await delay(fetchDelayMs);
+      }
+    }
+
+    return hydrated;
+  }
+
+  async function fetchCompaniesHouseProfile(companyNumber, apiKey) {
+    var lookupNumber = normalizeCompanyLookupNumber(companyNumber);
+    if (!lookupNumber || !apiKey) return null;
+
+    var response = await fetch('https://api.company-information.service.gov.uk/company/' + encodeURIComponent(lookupNumber), {
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Basic ' + btoa(apiKey + ':')
+      }
+    });
+
+    if (response.status === 404) {
+      return {
+        registeredAddress: '',
+        companyType: '',
+        incorporatedOn: '',
+        sicCodes: ''
+      };
+    }
+
+    if (!response.ok) {
+      throw new Error('Companies House HTTP ' + response.status + ' ' + response.statusText);
+    }
+
+    var data = await response.json();
+    return {
+      registeredAddress: buildRegisteredAddressString(data.registered_office_address || {}),
+      companyType: formatCompanyType(data.type || ''),
+      incorporatedOn: data.date_of_creation || '',
+      sicCodes: Array.isArray(data.sic_codes) ? data.sic_codes.join(', ') : ''
+    };
+  }
+
+  async function enrichNoticesWithCompaniesHouse(notices) {
+    var apiKey = (settings.companiesHouseApiKey || '').trim();
+    var rows = [];
+    var lookupOrder = [];
+    var seen = {};
+    var cacheChanged = false;
+    var fetchDelayMs = Math.max(settings.fetchDelay || 750, 650);
+
+    for (var i = 0; i < notices.length; i++) {
+      var normalized = normalizeStoredRow(notices[i]);
+      if (!normalized) continue;
+      normalized[COL.URL_COMPANY] = normalized[COL.URL_COMPANY] || buildCompanyUrl(normalized[COL.COMPANY_NUM]);
+      rows.push(normalized);
+    }
+
+    if (!apiKey || rows.length === 0) return rows;
+    if (window.location.protocol === 'file:') return rows;
+
+    for (var j = 0; j < rows.length; j++) {
+      var lookupNumber = normalizeCompanyLookupNumber(rows[j][COL.COMPANY_NUM]);
+      if (!lookupNumber || seen[lookupNumber]) continue;
+      seen[lookupNumber] = true;
+      lookupOrder.push(lookupNumber);
+    }
+
+    for (var k = 0; k < lookupOrder.length; k++) {
+      if (fetchCancelled) break;
+      var lookup = lookupOrder[k];
+      if (!Object.prototype.hasOwnProperty.call(companiesHouseCache, lookup)) {
+        showProgress(
+          'Enriching Companies House data <strong>' + (k + 1) + '</strong> of <strong>' + lookupOrder.length + '</strong>...',
+          Math.round(((k + 1) / lookupOrder.length) * 100)
+        );
+        try {
+          companiesHouseCache[lookup] = await fetchCompaniesHouseProfile(lookup, apiKey) || {
+            registeredAddress: '',
+            companyType: '',
+            incorporatedOn: '',
+            sicCodes: ''
+          };
+          cacheChanged = true;
+        } catch (err) {
+          console.warn('Companies House enrichment failed for ' + lookup + ':', err);
+          setCompaniesHouseStatus('Companies House enrichment is unavailable from this origin. Check your Companies House app js_domains setting.');
+          break;
+        }
+
+        if (k < lookupOrder.length - 1 && !fetchCancelled) {
+          await delay(fetchDelayMs);
+        }
+      }
+    }
+
+    if (cacheChanged) {
+      saveCompaniesHouseCache(companiesHouseCache);
+    }
+
+    for (var n = 0; n < rows.length; n++) {
+      var cachedLookup = normalizeCompanyLookupNumber(rows[n][COL.COMPANY_NUM]);
+      if (cachedLookup && companiesHouseCache[cachedLookup]) {
+        applyCompaniesHouseEnrichment(rows[n], companiesHouseCache[cachedLookup]);
+      }
+    }
+
+    return rows;
+  }
+
+  // ── Parse a single JSON feed entry into the current row schema ──
+  function parseNoticeEntry(entry) {
+    try {
+      // --- Fields from the feed entry itself ---
+      var title = (entry.title || '').trim();
+
+      // Notice ID from id field or link href
+      var noticeId = '';
+      var entryId = entry.id || '';
+      var idMatch = entryId.match(/(\d+)$/);
+      if (idMatch) {
+        noticeId = idMatch[1];
+      } else if (entry.link) {
+        var links = Array.isArray(entry.link) ? entry.link : [entry.link];
+        for (var li = 0; li < links.length; li++) {
+          var href = links[li]['@href'] || links[li].href || '';
+          var hm = href.match(/notice\/(\d+)/);
+          if (hm) { noticeId = hm[1]; break; }
+        }
+      }
+
+      // Publication Date
+      var pubDate = '';
+      var updated = entry.updated || entry.published || '';
+      if (updated) {
+        var pd = parseCalendarDateValue(updated);
+        if (pd && pd.isValid()) pubDate = toMDY(pd);
+      }
+
+      // URL Full Notice
+      var urlNotice = noticeId ? 'https://www.thegazette.co.uk/notice/' + noticeId : '';
+
+      // Type of corporate insolvency
+      var insolvencyType = '';
+      if (entry.category) {
+        insolvencyType = entry.category['@term'] || entry.category.term || '';
+      }
+
+      // --- Parse HTML content for remaining fields ---
+      var companyNumber = '';
+      var courtName = '';
+      var courtNumber = '';
+      var tradingName = '';
+      var natureBiz = '';
+      var regOffice = '';
+      var principalAddr = '';
+      var dateAppt = '';
+      var administrators = '';
+
+      var contentHtml = '';
+      if (entry.content) {
+        contentHtml = typeof entry.content === 'string' ? entry.content :
+                      (entry.content['#text'] || entry.content['$'] || entry.content._ || '');
+      }
+
+      if (contentHtml) {
+        // Strip HTML tags, decode entities, normalize whitespace
+        var tmp = document.createElement('div');
+        tmp.innerHTML = contentHtml;
+        var text = (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
+
+        // Company Name: prefer title from the feed, fallback to HTML
+        if (!title || title === 'TSO (The Stationery Office)' || title === 'tso') {
+          var nameMatch = text.match(/^(.+?)(?:\(Company Number|Company Number|In the)/i);
+          if (nameMatch) title = nameMatch[1].trim();
+        }
+
+        // Company Number — look for "(Company Number XXXXXXXX)" pattern first
+        var cnParen = text.match(/\(\s*Company\s*Number\s+([A-Z]{0,2}\d{4,8})\s*\)/i);
+        if (cnParen) {
+          companyNumber = cnParen[1].trim();
+        } else {
+          // Fallback: "Company Number:" or "Company Number" followed by the number
+          var cnColon = text.match(/Company\s*Number\s*:?\s*([A-Z]{0,2}\d{4,8})/i);
+          if (cnColon) companyNumber = cnColon[1].trim();
+        }
+
+        // Court Name — between "In the" and "Court Number" or end of that section
+        var courtMatch = text.match(/In the\s+(.+?)\s+Court\s*(?:Number|No\.)/i);
+        if (courtMatch) {
+          courtName = 'In the ' + courtMatch[1].trim() + ' Court';
+        } else {
+          // Try: "In the ... Court ..." up to company name or line break
+          var courtFB = text.match(/In the\s+((?:High Court|County Court|[A-Z][a-z]+).+?Court[^,]*)/i);
+          if (courtFB) courtName = courtFB[1].trim();
+          else {
+            var courtFB2 = text.match(/In the\s+(.+?)(?:\s+(?:CR-|No\.|Case|Number))/i);
+            if (courtFB2) courtName = courtFB2[1].trim();
+          }
+        }
+
+        // Court Number — after "Court Number:" or "No."
+        var courtNumM = text.match(/Court\s*Number\s*:?\s*([A-Z0-9][\w\-\/\s]*?\d[\w\-\/]*)/i);
+        if (courtNumM) {
+          courtNumber = courtNumM[1].trim().replace(/\s+/g, ' ');
+        } else {
+          var courtNumFB = text.match(/(?:Case\s*Number|No\.)\s*:?\s*([A-Z0-9][\w\-\/]+)/i);
+          if (courtNumFB) courtNumber = courtNumFB[1].trim();
+        }
+
+        // DBA/FKA/AKA style aliases in Gazette notices — collect ALL matches
+        var aliasRx = /(?:Trading\s+(?:Name|as)|Previous\s*Name(?:s)?|Formerly\s+Known\s+As|Also\s+Known\s+As|D\/?B\/?A|F\/?K\/?A|A\/?K\/?A)\s*:?\s*(.+?)(?=\s+(?:Nature of Business|Registered [Oo]ffice|Principal trading address|Date of Appointment|Names?\s+and\s+[Aa]ddress(?:es)?\s+of|(?:Joint\s+)?Administrators?|Further details|For further|Signed|Telephone)|$)/gi;
+        var aliases = [];
+        var aliasMatch;
+        while ((aliasMatch = aliasRx.exec(text)) !== null) {
+          var alias = aliasMatch[1].trim().replace(/\s+/g, ' ');
+          if (alias && alias.length > 1) aliases.push(alias);
+        }
+        if (aliases.length > 0) tradingName = aliases.join('; ');
+
+        // Nature of Business
+        var bizM = text.match(/Nature of Business\s*:?\s*(.+?)(?=Registered [Oo]ffice|Principal trading|Trading\s+(?:Name|as)|Date of Appointment|Names? and [Aa]ddress|(?:Joint )?Administrator|$)/i);
+        if (bizM) natureBiz = bizM[1].trim().replace(/\s+/g, ' ');
+
+        // Registered Office / Address
+        var regM = text.match(/Registered [Oo]ffice\s*:?\s*(.+?)(?=Principal trading|Date of Appointment|Names? and [Aa]ddress|(?:Joint )?Administrator|Nature of Business|Trading|$)/i);
+        if (regM) regOffice = regM[1].trim().replace(/\s+/g, ' ');
+
+        // Principal Trading Address
+        var principalM = text.match(/Principal trading address\s*:?\s*(.+?)(?=Date of Appointment|Names? and [Aa]ddress|(?:Joint )?Administrator|Nature of Business|Trading|Registered [Oo]ffice|$)/i);
+        if (principalM) principalAddr = principalM[1].trim().replace(/\s+/g, ' ');
+
+        // Date of Appointment
+        var dateM = text.match(/Date of Appointment\s*:?\s*(.+?)(?=Names? and [Aa]ddress|(?:Joint )?Administrator|Signed|For further|Further details|$)/i);
+        if (dateM) dateAppt = normalizeDateStr(dateM[1].trim());
+
+        // Administrators — try "Names and Address of Administrators:" first (most complete)
+        var adminM = text.match(/Names?\s+and\s+[Aa]ddress(?:es)?\s+of\s+(?:the\s+)?(?:Joint\s+)?Administrators?\s*:?\s*(.+?)(?=Further details|For further|Signed|Telephone|Date of Appointment|$)/i);
+        if (adminM) {
+          administrators = adminM[1].trim().replace(/\s+/g, ' ');
+        } else {
+          // Fallback: "Joint Administrator:" or "Administrator:"
+          var adminParts = [];
+          var adminRx = /(?:Joint\s+)?Administrators?\s*:?\s*(.+?)(?=(?:Joint\s+)?Administrators?\s*:|Further details|For further|Signed|Telephone|Date of Appointment|$)/gi;
+          var am;
+          while ((am = adminRx.exec(text)) !== null) {
+            var at = am[1].trim().replace(/\s+/g, ' ');
+            if (at && at.length > 2) adminParts.push(at);
+          }
+          if (adminParts.length > 0) {
+            administrators = adminParts.join('; ');
+          }
+        }
+      }
+
+      // Apply Proper Case to company name
+      title = toProperCase(title);
+      companyNumber = normalizeCompanyNumber(companyNumber);
+
+      // Build the 20-element row array
+      var row = [
+        pubDate,           // 0  Publication Date
+        title,             // 1  Company Name (Proper Case)
+        urlNotice,         // 2  URL Full Notice
+        insolvencyType,    // 3  Type of Corporate Insolvency
+        noticeId,          // 4  Notice ID
+        companyNumber,     // 5  Company Number
+        buildCompanyUrl(companyNumber), // 6 URL Company Number
+        courtName,         // 7  Court Name
+        courtNumber,       // 8  Court Number
+        tradingName,       // 9  Trading Name
+        natureBiz,         // 10 Nature of Business
+        regOffice,         // 11 Registered Office
+        principalAddr,     // 12 Principal Trading Address
+        dateAppt,          // 13 Date of Appointment
+        administrators,    // 14 Administrators
+        '',                // 15 Registered Address (Companies House)
+        '',                // 16 Company Type
+        '',                // 17 Incorporated On
+        '',                // 18 Nature of Business (SIC)
+        ''                 // 19 Important Message
+      ];
+
+      return syncComputedRowFields(row);
+    } catch (err) {
+      console.warn('Failed to parse notice entry:', err, entry);
+      return null;
+    }
+  }
+
+  // ── Fetch Gazette Notices (main orchestrator) ────────────
+  async function fetchGazetteNotices(startDate, endDate) {
+    var allNotices = [];
+    var page = 1;
+    var totalPages = 1;
+    var totalResults = 0;
+    var fetchDelayMs = settings.fetchDelay || 750;
+
+    fetchCancelled = false;
+    fetchInProgress = true;
+    setFetchButtons(true);
+
+    try {
+      showProgress('Connecting to The Gazette...', 0);
+
+      while (page <= totalPages) {
+        if (fetchCancelled) {
+          showProgress('<strong>Fetch cancelled.</strong> ' + allNotices.length + ' notices collected before cancellation.', 100);
+          break;
+        }
+
+        // Note: categorycode and noticetype URL params don't filter reliably
+        // on the Gazette API. We fetch all insolvency notices for the date
+        // range and filter client-side by f:notice-code.
+        var url = 'https://www.thegazette.co.uk/insolvency/notice/data.json'
+          + '?results-page-size=50'
+          + '&sort-by=latest-date'
+          + '&results-page=' + page;
+
+        if (startDate) url += '&start-publish-date=' + startDate;
+        if (endDate) url += '&end-publish-date=' + endDate;
+
+        var pct = totalPages > 1 ? Math.round(((page - 1) / totalPages) * 100) : 10;
+        showProgress('Fetching page <strong>' + page + '</strong> of <strong>' + totalPages + '</strong>... (' + allNotices.length + ' notices found)', pct);
+
+        var resp;
+        var fetchAttempts = 0;
+        var maxAttempts = 3;
+        while (fetchAttempts < maxAttempts) {
+          fetchAttempts++;
+          try {
+            resp = await fetchWithCors(url);
+            if (resp.ok) break;
+            // Server error — reset proxy preference and retry
+            if (resp.status >= 500) {
+              console.warn('HTTP ' + resp.status + ' on attempt ' + fetchAttempts + ', resetting proxy...');
+              corsMode = 'unknown';
+              if (fetchAttempts < maxAttempts) {
+                showProgress('<strong>Server error (HTTP ' + resp.status + ').</strong> Retrying (' + fetchAttempts + '/' + maxAttempts + ')...', pct);
+                await delay(2000 * fetchAttempts);
+                continue;
+              }
+            }
+            break; // non-5xx error, don't retry
+          } catch (netErr) {
+            console.error('Network error (attempt ' + fetchAttempts + '):', netErr.message);
+            corsMode = 'unknown';
+            if (fetchAttempts >= maxAttempts) {
+              throw new Error('Network error after ' + maxAttempts + ' attempts: ' + netErr.message);
+            }
+            showProgress('<strong>Network error:</strong> ' + netErr.message + '. Retrying (' + fetchAttempts + '/' + maxAttempts + ')...', pct);
+            await delay(2000 * fetchAttempts);
+          }
+        }
+
+        if (!resp || !resp.ok) {
+          throw new Error('HTTP ' + (resp ? resp.status + ' ' + resp.statusText : 'no response') + ' from Gazette API after ' + fetchAttempts + ' attempts');
+        }
+
+        var json = await resp.json();
+
+        // Parse pagination info from first page
+        if (page === 1) {
+          // The Gazette JSON uses namespace-prefixed keys
+          totalResults = parseInt(json['f:page-size'] ? json['f:total'] : 0, 10) || 0;
+          var pageSize = parseInt(json['f:page-size'] || '50', 10);
+
+          // If no f:total, try to count entries
+          if (!totalResults && json.entry) {
+            var entries = Array.isArray(json.entry) ? json.entry : [json.entry];
+            // If exactly page-size entries, there might be more pages
+            totalResults = entries.length;
+          }
+
+          if (totalResults === 0) {
+            showProgress('No notices published for <strong>' + startDate + '</strong>' + (startDate !== endDate ? ' to <strong>' + endDate + '</strong>' : '') + '.', 100);
+            fetchInProgress = false;
+            setFetchButtons(false);
+            setTimeout(hideProgress, 4000);
+            return [];
+          }
+
+          totalPages = Math.ceil(totalResults / pageSize);
+          console.log('Gazette API: ' + totalResults + ' total insolvency notices, ' + totalPages + ' pages (filtering client-side for admin codes)');
+        }
+
+        // Extract entries, filtering to administration notice codes only
+        // 2410=Appointment of Administrators, 2411=Administration Orders,
+        // 2412=Meetings of Creditors, 2413=Notices to Members, 2414=Deemed Consent
+        var ADMIN_CODES = {'2410':1, '2411':1, '2412':1, '2413':1, '2414':1};
+        var entries = [];
+        if (json.entry) {
+          entries = Array.isArray(json.entry) ? json.entry : [json.entry];
+        }
+
+        var pageSkipped = 0;
+        for (var i = 0; i < entries.length; i++) {
+          var noticeCode = entries[i]['f:notice-code'] || '';
+          if (!ADMIN_CODES[noticeCode]) {
+            pageSkipped++;
+            continue;
+          }
+          var row = parseNoticeEntry(entries[i]);
+          if (row && row[COL.NOTICE_ID]) {
+            allNotices.push(row);
+          }
+        }
+
+        // Update progress
+        pct = Math.round((page / totalPages) * 100);
+        showProgress('Fetching page <strong>' + page + '</strong> of <strong>' + totalPages + '</strong>... (<strong>' + allNotices.length + '</strong> admin notices found, ' + pageSkipped + ' other skipped)', pct);
+
+        page++;
+
+        // Delay between pages (except after the last page)
+        if (page <= totalPages && !fetchCancelled) {
+          await delay(fetchDelayMs);
+        }
+      }
+
+      allNotices = await hydrateNoticesWithGazetteDetails(allNotices);
+      allNotices = await enrichNoticesWithCompaniesHouse(allNotices);
+
+    } catch (err) {
+      console.error('Gazette fetch error:', err);
+      showProgress('<strong>Error:</strong> ' + err.message + '<br>You can use the <strong>Manual JSON Paste</strong> fallback below, or try the <strong>Debug API</strong> button.', 0);
+      $('#pasteArea').show();
+      fetchInProgress = false;
+      setFetchButtons(false);
+      return [];
+    }
+
+    fetchInProgress = false;
+    setFetchButtons(false);
+    return allNotices;
+  }
+
+  // ── Merge, Deduplicate, Save, Refresh ────────────────────
+  function mergeAndRefresh(newNotices) {
+    var existing = loadData();
+    var existingIds = {};
+    for (var i = 0; i < existing.length; i++) {
+      existingIds[existing[i][COL.NOTICE_ID]] = i;
+    }
+
+    var added = 0;
+    var dupes = 0;
+    var updated = 0;
+    for (var j = 0; j < newNotices.length; j++) {
+      var normalizedNotice = normalizeStoredRow(newNotices[j]);
+      if (!normalizedNotice) continue;
+      var nid = normalizedNotice[COL.NOTICE_ID];
+      if (existingIds[nid] !== undefined) {
+        dupes++;
+        var merged = mergeStoredRows(existing[existingIds[nid]], normalizedNotice);
+        existing[existingIds[nid]] = merged.row;
+        if (merged.changed) updated++;
+      } else {
+        existing.push(normalizedNotice);
+        existingIds[nid] = existing.length - 1;
+        added++;
+      }
+    }
+
+    saveData(existing);
+
+    // Update last-updated timestamp
+    var now = dayjs().format('YYYY-MM-DD HH:mm');
+    localStorage.setItem(LAST_UPDATED_KEY, now);
+    $('#statUpdated').text(now);
+
+    // Refresh DataTable
+    dataTable.clear();
+    dataTable.rows.add(existing);
+    dataTable.draw();
+
+    // Update stats
+    updateStats(existing);
+
+    // Show result
+    if (newNotices.length === 0) {
+      // message already shown by fetchGazetteNotices
+    } else {
+      var details = [];
+      if (updated > 0) details.push(updated + ' existing records refreshed');
+      if (dupes > 0) details.push(dupes + ' duplicates checked');
+      showProgress('Complete: <strong>' + added + ' new notices added</strong>' +
+        (details.length ? ' (' + details.join(', ') + ')' : '') +
+        '. Total records: <strong>' + existing.length + '</strong>.', 100);
+      setTimeout(hideProgress, 5000);
+    }
+  }
+
+  // ── Fetch Button Handlers ──────────────────────────────
+  $fetchToday.on('click', async function() {
+    if (fetchInProgress) return;
+    var todayStr = dayjs().format('YYYY-MM-DD');
+    var notices = await fetchGazetteNotices(todayStr, todayStr);
+    mergeAndRefresh(notices);
+  });
+
+  $fetchRange.on('click', async function() {
+    if (fetchInProgress) return;
+    var start = $startDate.val();
+    var end = $endDate.val();
+    if (!start || !end) {
+      alert('Please select both start and end dates.');
+      return;
+    }
+    if (start > end) {
+      alert('Start date must be before end date.');
+      return;
+    }
+    var notices = await fetchGazetteNotices(start, end);
+    mergeAndRefresh(notices);
+  });
+
+  $fetchNew.on('click', async function() {
+    if (fetchInProgress) return;
+    var data = loadData();
+    if (data.length === 0) {
+      alert('No existing data found. Use "Fetch Today" or "Fetch Date Range" first.');
+      return;
+    }
+    // Parse M/D/YYYY dates to find the latest one
+    var parsed = data.map(function(row) { return row[COL.PUB_DATE]; }).filter(Boolean)
+      .map(function(d) { return parseCalendarDateValue(d); })
+      .filter(function(d) { return d && d.isValid(); })
+      .sort(function(a, b) { return a.valueOf() - b.valueOf(); });
+    if (!parsed.length) {
+      alert('No valid dates found in existing data.');
+      return;
+    }
+    var lastDayjs = parsed[parsed.length - 1];
+    var lastDateDisplay = toMDY(lastDayjs);
+    // Start from the day after the last known date
+    var nextDay = lastDayjs.add(1, 'day').format('YYYY-MM-DD');
+    var todayStr = dayjs().format('YYYY-MM-DD');
+    if (nextDay > todayStr) {
+      showProgress('Data is already up to date (last record: <strong>' + lastDateDisplay + '</strong>).', 100);
+      setTimeout(hideProgress, 3000);
+      return;
+    }
+    var notices = await fetchGazetteNotices(nextDay, todayStr);
+    mergeAndRefresh(notices);
+  });
+
+  $cancelFetch.on('click', function() {
+    fetchCancelled = true;
+    console.log('Cancel fetch requested');
+  });
+
+  // ── Debug API Button ───────────────────────────────────
+  var $debugArea = $('#debugArea');
+  var $pasteArea = $('#pasteArea');
+
+  function debugLog(msg) {
+    $debugArea.show();
+    $debugArea.append(msg + '\n');
+    $debugArea.scrollTop($debugArea[0].scrollHeight);
+  }
+
+  $('#debugFetch').on('click', async function() {
+    $debugArea.show().text('');
+    var testUrl = 'https://www.thegazette.co.uk/insolvency/notice/data.json?noticetype=2410&results-page-size=5&sort-by=latest-date';
+
+    debugLog('=== GAZETTE API DEBUG ===');
+    debugLog('Test URL: ' + testUrl);
+    debugLog('');
+
+    // --- Attempt 1: Direct fetch ---
+    debugLog('--- Attempt 1: Direct fetch ---');
+    try {
+      var resp = await fetch(testUrl);
+      debugLog('Status: ' + resp.status + ' ' + resp.statusText);
+      debugLog('Content-Type: ' + (resp.headers.get('content-type') || '(none)'));
+      debugLog('Access-Control-Allow-Origin: ' + (resp.headers.get('access-control-allow-origin') || '(none)'));
+      var bodyText = await resp.text();
+      debugLog('Body length: ' + bodyText.length + ' chars');
+      debugLog('Body (first 3000 chars):');
+      debugLog(bodyText.substring(0, 3000));
+
+      // Try to parse as JSON
+      debugLog('');
+      debugLog('--- Parsing as JSON ---');
+      try {
+        var json = JSON.parse(bodyText);
+        debugLog('Top-level keys: ' + Object.keys(json).join(', '));
+        debugLog('');
+
+        // Look for entries
+        var entries = json.entry || json.entries || json.items || json.results || json['f:entry'];
+        if (!entries) {
+          debugLog('No "entry" key found. Checking all keys for arrays:');
+          Object.keys(json).forEach(function(k) {
+            var v = json[k];
+            debugLog('  ' + k + ': ' + (Array.isArray(v) ? 'Array[' + v.length + ']' : typeof v + (typeof v === 'string' ? ' = "' + v.substring(0,80) + '"' : '')));
+          });
+        } else {
+          var entryArr = Array.isArray(entries) ? entries : [entries];
+          debugLog('Found ' + entryArr.length + ' entries');
+          debugLog('');
+          debugLog('--- First entry (full) ---');
+          debugLog(JSON.stringify(entryArr[0], null, 2));
+
+          debugLog('');
+          debugLog('--- Parsing first entry ---');
+          var parsed = parseNoticeEntry(entryArr[0]);
+          debugLog('Parsed result:');
+          debugLog(JSON.stringify(parsed, null, 2));
+        }
+      } catch (jsonErr) {
+        debugLog('JSON parse error: ' + jsonErr.message);
+        debugLog('Response might be HTML or XML. First 500 chars:');
+        debugLog(bodyText.substring(0, 500));
+      }
+
+      debugLog('');
+      debugLog('=== Direct fetch SUCCEEDED ===');
+      return;
+    } catch (directErr) {
+      debugLog('Direct fetch FAILED: ' + directErr.message);
+    }
+
+    // --- Attempt 2: CORS proxy ---
+    debugLog('');
+    debugLog('--- Attempt 2: CORS proxy (corsproxy.io) ---');
+    var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(testUrl);
+    debugLog('Proxy URL: ' + proxyUrl);
+    try {
+      var resp2 = await fetch(proxyUrl);
+      debugLog('Status: ' + resp2.status + ' ' + resp2.statusText);
+      debugLog('Content-Type: ' + (resp2.headers.get('content-type') || '(none)'));
+      var bodyText2 = await resp2.text();
+      debugLog('Body length: ' + bodyText2.length + ' chars');
+      debugLog('Body (first 3000 chars):');
+      debugLog(bodyText2.substring(0, 3000));
+
+      debugLog('');
+      debugLog('--- Parsing as JSON ---');
+      try {
+        var json2 = JSON.parse(bodyText2);
+        debugLog('Top-level keys: ' + Object.keys(json2).join(', '));
+
+        var entries2 = json2.entry || json2.entries || json2.items || json2.results;
+        if (!entries2) {
+          debugLog('No "entry" key. All keys:');
+          Object.keys(json2).forEach(function(k) {
+            var v = json2[k];
+            debugLog('  ' + k + ': ' + (Array.isArray(v) ? 'Array[' + v.length + ']' : typeof v));
+          });
+        } else {
+          var entryArr2 = Array.isArray(entries2) ? entries2 : [entries2];
+          debugLog('Found ' + entryArr2.length + ' entries');
+          debugLog('');
+          debugLog('--- First entry (full) ---');
+          debugLog(JSON.stringify(entryArr2[0], null, 2));
+
+          debugLog('');
+          debugLog('--- Parsing first entry ---');
+          var parsed2 = parseNoticeEntry(entryArr2[0]);
+          debugLog('Parsed result:');
+          debugLog(JSON.stringify(parsed2, null, 2));
+        }
+      } catch (jsonErr2) {
+        debugLog('JSON parse error: ' + jsonErr2.message);
+        debugLog('First 500 chars: ' + bodyText2.substring(0, 500));
+      }
+
+      debugLog('');
+      debugLog('=== Proxy fetch SUCCEEDED ===');
+      return;
+    } catch (proxyErr) {
+      debugLog('Proxy fetch FAILED: ' + proxyErr.message);
+    }
+
+    // --- Attempt 3: Atom feed ---
+    debugLog('');
+    debugLog('--- Attempt 3: Atom XML feed ---');
+    var atomUrl = 'https://www.thegazette.co.uk/insolvency/notice/data.feed?noticetype=2410&results-page-size=5&sort-by=latest-date';
+    var atomProxy = 'https://corsproxy.io/?' + encodeURIComponent(atomUrl);
+    try {
+      var resp3 = await fetch(atomProxy);
+      debugLog('Status: ' + resp3.status + ' ' + resp3.statusText);
+      var bodyText3 = await resp3.text();
+      debugLog('Body length: ' + bodyText3.length + ' chars');
+      debugLog('First 2000 chars:');
+      debugLog(bodyText3.substring(0, 2000));
+    } catch (atomErr) {
+      debugLog('Atom feed FAILED: ' + atomErr.message);
+    }
+
+    // --- All failed: show paste fallback ---
+    debugLog('');
+    debugLog('=== ALL FETCH METHODS FAILED ===');
+    debugLog('Showing manual paste fallback...');
+    $pasteArea.show();
+  });
+
+  // ── Manual Paste Handler ───────────────────────────────
+  $('#parsePasted').on('click', async function() {
+    var raw = $('#pasteJson').val().trim();
+    if (!raw) { alert('Please paste JSON data first.'); return; }
+    try {
+      var json = JSON.parse(raw);
+      var entries = json.entry || json.entries || json.items || [];
+      if (!Array.isArray(entries)) entries = [entries];
+      debugLog('');
+      debugLog('--- Parsing pasted JSON ---');
+      debugLog('Top-level keys: ' + Object.keys(json).join(', '));
+      debugLog('Entries found: ' + entries.length);
+      if (entries.length > 0) {
+        debugLog('First entry keys: ' + Object.keys(entries[0]).join(', '));
+      }
+
+      var notices = [];
+      for (var i = 0; i < entries.length; i++) {
+        var row = parseNoticeEntry(entries[i]);
+        if (row && row[COL.NOTICE_ID]) notices.push(row);
+      }
+      debugLog('Successfully parsed: ' + notices.length + ' notices');
+      if (notices.length > 0) {
+        var detailed = await hydrateNoticesWithGazetteDetails(notices);
+        var enriched = await enrichNoticesWithCompaniesHouse(detailed);
+        mergeAndRefresh(enriched);
+        debugLog('Data loaded into table!');
+      } else {
+        debugLog('No notices parsed. Check the entry structure above.');
+      }
+    } catch (e) {
+      alert('JSON parse error: ' + e.message);
+      debugLog('Paste parse error: ' + e.message);
+    }
+  });
+
+  // ── Export Functions ─────────────────────────────────────
+  function getExportData() {
+    // Get data from currently filtered/visible rows
+    var filteredData = [];
+    dataTable.rows({ search: 'applied' }).every(function() {
+      filteredData.push([
+        this.data()[COL.PUB_DATE],
+        this.data()[COL.COMPANY_NAME],
+        this.data()[COL.TRADING_NAME],
+        this.data()[COL.URL_NOTICE],
+        this.data()[COL.TYPE],
+        this.data()[COL.NOTICE_ID],
+        this.data()[COL.COMPANY_NUM],
+        this.data()[COL.URL_COMPANY],
+        this.data()[COL.COURT_NAME],
+        this.data()[COL.COURT_NUM],
+        this.data()[COL.NATURE_BIZ],
+        this.data()[COL.REG_OFFICE],
+        this.data()[COL.PRINCIPAL_ADDR],
+        this.data()[COL.DATE_APPT],
+        this.data()[COL.IMPORTANT_MSG],
+        this.data()[COL.INCORPORATED_ON],
+        this.data()[COL.SIC_CODES]
+      ]);
+    });
+    return filteredData;
+  }
+
+  function getColumnHeaders() {
+    return [
+      'Publication Date',
+      'Company Name',
+      'DBA/FKA/AKA',
+      'URL Full Notice',
+      'Type of Corporate Insolvency',
+      'Notice ID',
+      'Company Number',
+      'URL Company Number',
+      'Court Name',
+      'Court Number',
+      'Nature of Business',
+      'Registered Office',
+      'Principal Trading Address',
+      'Date of Appointment',
+      'Important Message',
+      'Incorporated On',
+      'Nature of Business (SIC)'
+    ];
+  }
+
+  $exportExcel.on('click', function() {
+    const data = getExportData();
+    if (data.length === 0) {
+      alert('No data to export.');
+      return;
+    }
+    const headers = getColumnHeaders();
+    const wsData = [headers].concat(data);
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Set column widths
+    ws['!cols'] = headers.map(function(h) {
+      return { wch: Math.max(h.length, 15) };
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Gazette Administrations');
+    XLSX.writeFile(wb, 'gazette_administrations_' + dayjs().format('YYYY-MM-DD') + '.xlsx');
+  });
+
+  $exportCsv.on('click', function() {
+    const data = getExportData();
+    if (data.length === 0) {
+      alert('No data to export.');
+      return;
+    }
+    const headers = getColumnHeaders();
+    const wsData = [headers].concat(data);
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const csv = XLSX.utils.sheet_to_csv(ws);
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'gazette_administrations_' + dayjs().format('YYYY-MM-DD') + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+})();
+</script>
+
+</body>
+</html>
