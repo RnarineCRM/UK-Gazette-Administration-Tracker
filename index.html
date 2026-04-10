@@ -327,23 +327,10 @@ body {
 
 /* ── Data Table Card ────────────────────────────────────── */
 .table-scroll-top {
-  display: none;
-  background: #fff;
-  border: 1px solid #dde2e8;
-  border-radius: 6px;
-  margin-bottom: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  height: 22px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  position: sticky;
-  top: 8px;
-  z-index: 90;
-  cursor: grab;
+  display: none !important;
 }
-.table-scroll-top.dragging { cursor: grabbing; }
 .table-scroll-sync {
-  height: 1px;
+  display: none !important;
 }
 .table-card {
   background: #fff;
@@ -351,27 +338,15 @@ body {
   border-radius: 6px;
   padding: 16px 20px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
-/* ── Floating bottom scrollbar ─────────────────────────── */
+/* ── Floating bottom scrollbar (disabled — no horizontal scroll) ── */
 .table-scroll-bottom {
-  display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  height: 20px;
-  background: #f7f9fb;
-  border-top: 1px solid #c8d6e5;
-  z-index: 200;
-  cursor: grab;
+  display: none !important;
 }
-.table-scroll-bottom.dragging { cursor: grabbing; }
 .table-scroll-bottom-inner {
-  height: 1px;
+  display: none !important;
 }
 
 /* DataTables overrides */
@@ -398,10 +373,7 @@ table.dataTable {
   border-collapse: collapse !important;
   width: 100% !important;
   font-size: 13px;
-}
-.dataTables_wrapper .dataTables_scrollHead table.dataTable,
-.dataTables_wrapper .dataTables_scrollBody table.dataTable {
-  table-layout: fixed !important;
+  table-layout: auto !important;
 }
 table.dataTable thead th {
   background: #f7f9fb;
@@ -412,10 +384,10 @@ table.dataTable thead th {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 10px 12px !important;
-  white-space: nowrap;
+  white-space: normal;
   position: relative;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 table.dataTable thead th.resizable-column {
   padding-right: 20px !important;
@@ -448,10 +420,6 @@ body.column-resizing {
   cursor: col-resize !important;
   user-select: none;
 }
-body.horizontal-dragging {
-  user-select: none;
-  cursor: grabbing !important;
-}
 .table-card {
   cursor: default;
 }
@@ -459,9 +427,9 @@ table.dataTable tbody td {
   padding: 8px 12px !important;
   border-bottom: 1px solid #eef1f5 !important;
   vertical-align: top;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
   user-select: text;
   -webkit-user-select: text;
   -moz-user-select: text;
@@ -483,10 +451,9 @@ table.dataTable a.notice-link {
   color: #2980b9;
   text-decoration: none;
   font-weight: 500;
-  display: inline-block;
-  max-width: 100%;
+  display: inline;
   overflow-wrap: anywhere;
-  word-break: break-word;
+  word-break: break-all;
 }
 table.dataTable a.notice-link:hover {
   text-decoration: underline;
@@ -686,7 +653,7 @@ table.dataTable a.notice-link:hover {
   <div class="table-scroll-top" id="tableScrollTop"><div class="table-scroll-sync" id="tableScrollSync"></div></div>
   <div class="table-scroll-bottom" id="tableScrollBottom"><div class="table-scroll-bottom-inner" id="tableScrollBottomInner"></div></div>
   <div class="table-card">
-    <table id="gazetteTable" class="display nowrap" style="width:100%">
+    <table id="gazetteTable" class="display" style="width:100%">
       <thead>
         <tr>
           <th>Publication Date</th>
@@ -1043,8 +1010,8 @@ window.crmLookup = function(companyNum) {
     order: [[0, 'desc']],   // Publication Date descending
     pageLength: 50,
     lengthMenu: [10, 25, 50, 100, 250],
-    scrollX: true,
-    autoWidth: false,
+    scrollX: false,
+    autoWidth: true,
     colReorder: true,
     dom: 'Blfrtip',
     buttons: [
@@ -1057,26 +1024,13 @@ window.crmLookup = function(companyNum) {
     columnDefs: [
       // Default hidden columns for readability
       { visible: false, targets: [5, 7, 15, 16] },
-      // Max widths for long-text columns
-      { width: '95px', targets: [0, 5, 6, 13, 15] },
-      { width: '220px', targets: [1, 2, 8, 10, 11, 12, 16] },
-      { width: '260px', targets: [3, 7] },
-      { width: '140px', targets: [4] },
-      { width: '120px', targets: [9] },
-      { width: '360px', targets: [14] },
       {
-        // Company Name, DBA/FKA/AKA, and Important Message: show full text
-        targets: [1, 2, 14],
+        // All cells: wrap text, show title on hover
+        targets: '_all',
         createdCell: function(td, cellData) {
           td.style.whiteSpace = 'normal';
           td.style.overflowWrap = 'break-word';
           td.style.wordBreak = 'break-word';
-          if (cellData != null) td.title = String(cellData);
-        }
-      },
-      {
-        targets: '_all',
-        createdCell: function(td, cellData) {
           if (cellData != null) td.title = String(cellData);
         }
       }
@@ -1108,7 +1062,10 @@ window.crmLookup = function(companyNum) {
   }
 
   function getVisibleHeaderCells() {
-    return getDataTableWrapper().find('.dataTables_scrollHead thead th:visible');
+    var $wrapper = getDataTableWrapper();
+    var $cells = $wrapper.find('.dataTables_scrollHead thead th:visible');
+    if (!$cells.length) $cells = $wrapper.find('thead th:visible');
+    return $cells;
   }
 
   function getVisibleColumnDataIndex(visibleIndex) {
@@ -1120,10 +1077,10 @@ window.crmLookup = function(companyNum) {
     var nth = visibleIndex + 1;
     var $wrapper = getDataTableWrapper();
 
-    $wrapper.find('.dataTables_scrollHead table colgroup col:nth-child(' + nth + '), .dataTables_scrollBody table colgroup col:nth-child(' + nth + ')')
+    $wrapper.find('table colgroup col:nth-child(' + nth + ')')
       .css({ width: safeWidth + 'px', minWidth: safeWidth + 'px', maxWidth: safeWidth + 'px' });
 
-    $wrapper.find('.dataTables_scrollHead thead th:nth-child(' + nth + ')')
+    $wrapper.find('thead th:nth-child(' + nth + ')')
       .css({ width: safeWidth + 'px', minWidth: safeWidth + 'px', maxWidth: safeWidth + 'px' });
   }
 
@@ -1264,20 +1221,11 @@ window.crmLookup = function(companyNum) {
     syncingFloatingScroll = false;
   });
 
-  $tableScrollTop.on('mousedown', function(event) {
-    startHorizontalDrag($tableScrollTop, event);
-  });
+  // Scrollbar drag handlers disabled — no horizontal scroll
 
-  $tableScrollBottom.on('mousedown', function(event) {
-    startHorizontalDrag($tableScrollBottom, event);
-  });
+  // Drag-to-scroll on table card disabled — text selection enabled instead
 
-  $(document).on('mousedown', '.table-card', function(event) {
-    var $body = getTableScrollBody();
-    if ($body.length) startHorizontalDrag($body, event);
-  });
-
-  getDataTableWrapper().on('mousedown', '.dataTables_scrollHead .col-resize-handle', function(event) {
+  getDataTableWrapper().on('mousedown', '.col-resize-handle', function(event) {
     if (event.which !== 1) return;
     var $th = $(this).closest('th');
     var visibleIndex = $th.index();
@@ -1301,23 +1249,7 @@ window.crmLookup = function(companyNum) {
       return;
     }
 
-    if (dragScrollState) {
-      var dx = event.pageX - dragScrollState.startX;
-      if (!dragScrollState.activated) {
-        // Only activate drag after passing the movement threshold
-        if (Math.abs(dx) < DRAG_THRESHOLD) return;
-        dragScrollState.activated = true;
-        // Clear any accidental text selection from the initial click
-        if (window.getSelection) window.getSelection().removeAllRanges();
-        $('body').addClass('horizontal-dragging');
-        var $el = dragScrollState.$el;
-        if ($el.is($tableScrollTop) || $el.is($tableScrollBottom)) {
-          $el.addClass('dragging');
-        }
-      }
-      dragScrollState.$el.scrollLeft(dragScrollState.startScrollLeft - dx);
-      event.preventDefault();
-    }
+    // Drag-scroll disabled — text selection preserved
   });
 
   $(document).on('mouseup', function() {
@@ -1334,15 +1266,7 @@ window.crmLookup = function(companyNum) {
       refreshColumnResizeHandles();
     }
 
-    if (dragScrollState) {
-      if (dragScrollState.activated) {
-        dragScrollState.$el.removeClass('dragging');
-        $tableScrollTop.removeClass('dragging');
-        $tableScrollBottom.removeClass('dragging');
-        $('body').removeClass('horizontal-dragging');
-      }
-      dragScrollState = null;
-    }
+    // Drag-scroll cleanup removed — no longer needed
   });
 
   dataTable.on('draw.dt column-visibility.dt column-reorder.dt', function() {
