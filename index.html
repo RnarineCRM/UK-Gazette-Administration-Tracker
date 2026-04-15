@@ -561,6 +561,78 @@ table.dataTable a.notice-link:hover {
 </head>
 <body>
 
+<!-- ═══════════════════ PASSWORD GATE ═══════════════════ -->
+<style>
+  #auth-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: #0f1923; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  #auth-overlay .auth-box {
+    background: #1a2a3a; border-radius: 10px; padding: 40px;
+    text-align: center; min-width: 340px; box-shadow: 0 4px 24px rgba(0,0,0,.5);
+  }
+  #auth-overlay h2 { color: #e0e0e0; margin-bottom: 24px; font-size: 1.4rem; }
+  #auth-overlay input {
+    width: 100%; padding: 10px 14px; border: 1px solid #2d4a5e; border-radius: 6px;
+    background: #0f1923; color: #e0e0e0; font-size: 1rem; outline: none;
+  }
+  #auth-overlay input:focus { border-color: #4a9eff; }
+  #auth-overlay button {
+    margin-top: 16px; width: 100%; padding: 10px; border: none; border-radius: 6px;
+    background: #4a9eff; color: #fff; font-size: 1rem; cursor: pointer;
+  }
+  #auth-overlay button:hover { background: #3b8be0; }
+  #auth-overlay .auth-error {
+    color: #ff6b6b; margin-top: 12px; min-height: 1.2em; font-size: .9rem;
+  }
+  body.auth-locked > *:not(#auth-overlay):not(script):not(style) { visibility: hidden; }
+</style>
+
+<div id="auth-overlay">
+  <div class="auth-box">
+    <h2>Dashboard Login</h2>
+    <input type="password" id="auth-password" placeholder="Enter password" autocomplete="off" />
+    <button id="auth-submit">Login</button>
+    <div class="auth-error" id="auth-error"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const HASH = 'bf7501fa9ed510c8a5254604fd9610586ef866b1fd9f246760464e3303153119';
+
+  if (sessionStorage.getItem('gazette_auth') === 'ok') {
+    document.getElementById('auth-overlay').style.display = 'none';
+  } else {
+    document.body.classList.add('auth-locked');
+  }
+
+  async function sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function tryLogin() {
+    const pw = document.getElementById('auth-password').value;
+    const hash = await sha256(pw);
+    if (hash === HASH) {
+      sessionStorage.setItem('gazette_auth', 'ok');
+      document.getElementById('auth-overlay').style.display = 'none';
+      document.body.classList.remove('auth-locked');
+    } else {
+      document.getElementById('auth-error').textContent = 'Incorrect password';
+    }
+  }
+
+  document.getElementById('auth-submit').addEventListener('click', tryLogin);
+  document.getElementById('auth-password').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') tryLogin();
+  });
+})();
+</script>
+
 <!-- ═══════════════════ HEADER ═══════════════════ -->
 <div class="header">
   <h1><span>GAZETTE</span> Administration Tracker</h1>
