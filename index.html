@@ -664,20 +664,23 @@ table.dataTable a.notice-link:hover {
 <!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
 <div class="container">
 
-  <!-- ── Fetch Controls ── -->
-  <div class="fetch-controls">
-    <button class="btn-primary" id="fetchToday">Fetch Today</button>
-    <div class="fetch-separator"></div>
-    <span class="date-label">From</span>
-    <input type="date" class="date-input" id="startDate">
-    <span class="date-label">To</span>
-    <input type="date" class="date-input" id="endDate">
-    <button class="btn-primary" id="fetchRange">Fetch Date Range</button>
-    <div class="fetch-separator"></div>
-    <button class="btn-primary" id="fetchNew">Fetch New Since Last Run</button>
-    <div class="fetch-separator"></div>
-    <button class="btn-primary" id="debugFetch" style="background:#e67e22">Debug API</button>
-  </div>
+  <!-- ── Fetch Controls (advanced — usually blocked by the Gazette's WAF) ── -->
+  <details style="margin-bottom:12px;">
+    <summary style="font-size:12px; color:#8899aa; cursor:pointer; padding:4px 0;">&#9881; Advanced: try fetching automatically (the Gazette usually blocks this &mdash; use the steps below instead)</summary>
+    <div class="fetch-controls" style="margin-top:8px; margin-bottom:0;">
+      <button class="btn-primary" id="fetchToday">Fetch Today</button>
+      <div class="fetch-separator"></div>
+      <span class="date-label">From</span>
+      <input type="date" class="date-input" id="startDate">
+      <span class="date-label">To</span>
+      <input type="date" class="date-input" id="endDate">
+      <button class="btn-primary" id="fetchRange">Fetch Date Range</button>
+      <div class="fetch-separator"></div>
+      <button class="btn-primary" id="fetchNew">Fetch New Since Last Run</button>
+      <div class="fetch-separator"></div>
+      <button class="btn-primary" id="debugFetch" style="background:#e67e22">Debug API</button>
+    </div>
+  </details>
 
   <!-- ── Progress Area ── -->
   <div class="progress-area" id="progressArea">
@@ -693,23 +696,75 @@ table.dataTable a.notice-link:hover {
   <!-- ── Debug Output ── -->
   <div id="debugArea" style="display:none; background:#1a1a2e; color:#0f0; border-radius:6px; padding:16px; margin-bottom:12px; font-family:Consolas,monospace; font-size:12px; max-height:500px; overflow:auto; white-space:pre-wrap; word-break:break-all;"></div>
 
-  <!-- ── Manual Paste Fallback ── -->
-  <div id="pasteArea" style="display:none; background:#fff; border:1px solid #dde2e8; border-radius:6px; padding:16px; margin-bottom:12px;">
-    <p style="margin-bottom:8px; font-weight:600; color:#1a1a2e;">Manual JSON Paste (AWS WAF fallback)</p>
-    <p style="margin-bottom:6px; font-size:12px; color:#5a6c7d;">The Gazette now blocks direct background fetches with an AWS WAF JavaScript challenge. A real browser tab solves the challenge automatically, so manual paste still works:</p>
-    <ol style="margin:0 0 10px 22px; font-size:12px; color:#5a6c7d; line-height:1.6;">
-      <li>Open <a id="pasteSourceLink" href="https://www.thegazette.co.uk/insolvency/notice/data.json?results-page-size=50&sort-by=latest-date" target="_blank" rel="noopener">the Gazette JSON URL for your selected date range</a> in a new tab. Wait for the JSON to render.</li>
-      <li>Press <strong>Ctrl+A</strong>, then <strong>Ctrl+C</strong> to copy the entire response.</li>
-      <li>Paste below and click <strong>Add Page</strong>. Repeat for each result page (50 notices per page) until you have them all, then click <strong>Process Pages</strong>.</li>
-    </ol>
-    <p style="margin:0 0 6px 0; font-size:12px; color:#5a6c7d;">Per-notice detail enrichment is also WAF-blocked, so this fallback uses the data embedded in each feed entry. Companies House enrichment still runs if an API key is configured.</p>
-    <textarea id="pasteJson" style="width:100%; height:120px; font-family:Consolas,monospace; font-size:12px; border:1px solid #c8d6e5; border-radius:4px; padding:8px;" placeholder="Paste Gazette JSON response here..."></textarea>
-    <div style="margin-top:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-      <button class="btn-primary" id="addPastedPage">Add Page</button>
-      <button class="btn-primary" id="parsePasted">Process Pages</button>
-      <button class="btn-danger" id="clearPastedPages" style="background:#7f8c8d;">Clear Staged</button>
-      <span id="pasteStagedStatus" style="font-size:12px; color:#5a6c7d;">No pages staged yet.</span>
+  <!-- ── Load Notices (paste workflow — the Gazette blocks direct fetch) ── -->
+  <div id="pasteArea" style="background:#fff; border:2px solid #2980b9; border-radius:8px; padding:18px 20px; margin-bottom:12px;">
+    <p style="margin:0 0 4px; font-weight:700; color:#1a1a2e; font-size:16px;">&#128229; Load Notices &mdash; Manual Paste</p>
+    <p style="margin:0 0 16px; font-size:13px; color:#5a6c7d;">The Gazette's firewall now blocks automatic fetching, but a normal browser tab still works fine. Paste the day's list once, then the green panel below hands you each notice's detail page to click and paste. About a minute a day.</p>
+
+    <!-- STEP 1 -->
+    <div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:16px;">
+      <div style="flex:0 0 28px; height:28px; border-radius:50%; background:#2980b9; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:14px;">1</div>
+      <div style="flex:1; min-width:0; font-size:13px; color:#1a1a2e; line-height:1.6;">
+        <div style="margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span style="font-weight:600;">Dates:</span>
+          <input type="date" id="mfStart" class="date-input">
+          <span>to</span>
+          <input type="date" id="mfEnd" class="date-input">
+          <span style="font-size:12px; color:#8899aa;">(defaults to today)</span>
+        </div>
+        Open <a id="feedUrlLink" href="#" target="_blank" rel="noopener"><strong>the Gazette insolvency list for these dates</strong></a> in a new tab. It shows raw JSON &mdash; that's expected. Click anywhere in it, press <strong>Ctrl+A</strong> then <strong>Ctrl+C</strong> to copy the whole page.
+        <div style="font-size:12px; color:#8899aa; margin-top:4px;">The list is all insolvency notices &mdash; the dashboard keeps only administrations. After you load a page, the status line tells you whether there are more pages to grab for the range.</div>
+      </div>
     </div>
+
+    <!-- STEP 2 -->
+    <div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:16px;">
+      <div style="flex:0 0 28px; height:28px; border-radius:50%; background:#2980b9; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:14px;">2</div>
+      <div style="flex:1; min-width:0; font-size:13px; color:#1a1a2e; line-height:1.6;">
+        Come back here, click inside the box below, paste with <strong>Ctrl+V</strong>, and click <strong>Load Into Table</strong>. The companies appear in the table, and the green <strong>Fill in the details</strong> panel lists what's still missing.
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:10px;">
+      <div style="flex:0 0 28px; height:28px; border-radius:50%; background:#27ae60; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:14px;">3</div>
+      <div style="flex:1; min-width:0; font-size:13px; color:#1a1a2e; line-height:1.6;">
+        In the green panel, click each company to open its full record, then <strong>Ctrl+A</strong>, <strong>Ctrl+C</strong>, paste it back in the same box, and click <strong>Load Into Table</strong> again. Each one merges and ticks off &mdash; keep going until the bar is full. &#127881;
+      </div>
+    </div>
+
+    <p style="margin:16px 0 4px; font-weight:700; font-size:13px; color:#2980b9;">&#128071; Paste box &mdash; use this one box for <u>both</u> Step 2 (the list) and Step 3 (each detail record):</p>
+    <textarea id="pasteJson" style="width:100%; height:90px; font-family:Consolas,monospace; font-size:12px; border:2px solid #2980b9; border-radius:4px; padding:8px; margin-top:2px; background:#f7fbff;" placeholder="Paste Gazette JSON here with Ctrl+V — the day's list, or a single notice's detail record — then click Load Into Table."></textarea>
+    <div style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+      <button class="btn-export" id="parsePasted" style="font-size:14px;">&#9654; Load Into Table</button>
+      <button class="btn-danger" id="clearPastedPages" style="background:#b0b8c0;">Clear</button>
+      <span id="pasteStagedStatus" style="font-size:12px; color:#5a6c7d;">Paste the JSON above, then click Load Into Table.</span>
+    </div>
+    <div id="pasteDiag" style="font-size:12px; line-height:1.5; margin-top:8px;"></div>
+
+    <details style="margin-top:14px;">
+      <summary style="font-size:12px; color:#8899aa; cursor:pointer;">Other ways (advanced &mdash; only if the Copy button won't work)</summary>
+      <div style="padding:10px 0 0 4px; font-size:12px; color:#5a6c7d; line-height:1.6;">
+        <p style="margin:0 0 8px; color:#c0392b;"><strong>Note:</strong> the old auto-collector bookmarklet and console script no longer work &mdash; the Gazette's firewall blocks background fetches. The manual paste in Steps 1&ndash;3 above is the reliable way.</p>
+        <p style="margin:0 0 4px;"><strong>Fully by hand (no script at all):</strong></p>
+        <ol style="margin:0 0 0 20px;">
+          <li>Open <a id="pasteSourceLink" href="https://www.thegazette.co.uk/insolvency/notice/data.json?results-page-size=50&sort-by=latest-date" target="_blank" rel="noopener">the Gazette JSON list</a>, select all (Ctrl+A), copy (Ctrl+C), paste in the box, click <strong>Load Into Table</strong>. If a busy day spills past one page, change <code>results-page=2</code> in the URL and paste that too &mdash; duplicates are ignored.</li>
+          <li>For each notice's full details, open <strong>https://www.thegazette.co.uk/notice/{ID}/data.json?view=linked-data</strong>, copy the JSON (it starts with <code>{</code>), paste, and click <strong>Load Into Table</strong> again. (Details fill in Date of Appointment, Administrators, addresses &amp; Nature of Business, which the plain list leaves blank.)</li>
+        </ol>
+      </div>
+    </details>
+  </div>
+
+  <!-- ── Fill in the details (manual-paste completeness panel) ── -->
+  <div id="detailsPanel" style="display:none; background:#fff; border:2px solid #27ae60; border-radius:8px; padding:16px 20px; margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <p style="margin:0; font-weight:700; font-size:15px; color:#1a1a2e;">&#129513; Fill in the details &mdash; <span id="detailsCount" style="color:#1e8e4e;">0 / 0</span> captured</p>
+      <div id="detailsActions" style="display:flex; gap:8px;">
+        <button class="btn-primary" id="copyDetailLinks" style="background:#27ae60;">Copy all remaining links</button>
+      </div>
+    </div>
+    <div style="height:8px; background:#e6eaef; border-radius:4px; overflow:hidden; margin:12px 0;"><div id="detailsBar" style="height:100%; width:0; background:#27ae60; transition:width .25s ease;"></div></div>
+    <div id="detailsList" style="max-height:300px; overflow:auto;"></div>
   </div>
 
   <!-- ── Summary Stats ── -->
@@ -1119,7 +1174,7 @@ window.crmLookup = function(companyNum) {
       }
     ],
     language: {
-      emptyTable: 'No records loaded. Use the fetch controls above to retrieve Gazette notices.',
+      emptyTable: 'No notices loaded yet. Follow the 3 easy steps in the blue box above to load them.',
       info: 'Showing _START_ to _END_ of _TOTAL_ records',
       infoEmpty: 'No records available',
       search: 'Search:'
@@ -2551,6 +2606,9 @@ window.crmLookup = function(companyNum) {
     // Update stats
     updateStats(existing);
 
+    // Refresh the "fill in the details" checklist after every merge
+    renderDetailsPanel();
+
     // Show result
     if (newNotices.length === 0) {
       // message already shown by fetchGazetteNotices
@@ -2772,17 +2830,93 @@ window.crmLookup = function(companyNum) {
   });
 
   // ── Manual Paste Handler (multi-page staging for WAF fallback) ──
+  // Two kinds of pasted JSON are accepted and auto-detected:
+  //   • Feed list      (has an `entry` array)            → the notice list / heading fields
+  //   • Notice detail  (`data.json?view=linked-data`,    → full body fields incl.
+  //                      has result.primaryTopic)           Date of Appointment & Administrators
+  // The feed `content` is only a ~200-char truncated teaser, so the body fields
+  // (Date of Appointment, Administrators, addresses, Nature of Business) can ONLY
+  // come from the per-notice detail record. Those detail docs merge onto the
+  // matching feed row by Notice ID.
   var stagedPastedPages = []; // array of { entries: [...], count: N }
+  var stagedDetailDocs = [];  // array of { detailJson, noticeId }
+
+  function extractNoticeIdFromDetail(detailJson, rawText) {
+    try {
+      var result = detailJson.result || {};
+      var topic = result.primaryTopic || {};
+      // Gazette linked-data exposes the ID directly on the primary topic.
+      var direct = topic.hasNoticeID || topic.hasNoticeNumber;
+      if (direct != null && /^\d+$/.test(String(direct))) return String(direct);
+      // Otherwise pull it from any of the notice URIs (note the real key is `_about`).
+      var candidates = [
+        topic._about, topic.has_anchor, topic['@id'], topic.id, topic.uri, topic.isPrimaryTopicOf,
+        result._about, result['@id'], result.id, result.uri
+      ];
+      for (var i = 0; i < candidates.length; i++) {
+        var m = (candidates[i] || '').toString().match(/notice\/(\d+)/);
+        if (m) return m[1];
+      }
+    } catch (e) { /* ignore */ }
+    // Safety net: the raw JSON always carries notice URLs — Gazette escapes the
+    // slashes as `\/`, so unescape before matching.
+    var rm = (rawText || '').replace(/\\\//g, '/').match(/\/notice\/(\d+)/);
+    return rm ? rm[1] : '';
+  }
+
+  // Classify a pasted JSON blob. Throws on invalid JSON (caller handles).
+  function classifyPastedJson(rawText) {
+    var json = JSON.parse(rawText);
+    // One-shot bundle produced by the "Collect Gazette day" bookmarklet:
+    // { format:'gazette-bundle', feed:[feed entries], details:[linked-data docs] }
+    if (json && (json.format === 'gazette-bundle' || Array.isArray(json.feed) || Array.isArray(json.details))) {
+      return {
+        type: 'bundle',
+        entries: Array.isArray(json.feed) ? json.feed : [],
+        details: Array.isArray(json.details) ? json.details : []
+      };
+    }
+    if (json && json.result && json.result.primaryTopic) {
+      json.__raw = rawText;
+      return { type: 'detail', detailJson: json, noticeId: extractNoticeIdFromDetail(json, rawText) };
+    }
+    var entries = json && (json.entry || json.entries || json.items);
+    if (entries) {
+      if (!Array.isArray(entries)) entries = [entries];
+      return { type: 'feed', entries: entries };
+    }
+    return { type: 'unknown' };
+  }
+
+  // Wrap a raw per-notice detail object (e.g. from a bundle) as a staged doc.
+  function makeDetailDoc(detailObj) {
+    var raw = JSON.stringify(detailObj); // stringify BEFORE adding __raw
+    detailObj.__raw = raw;
+    return { detailJson: detailObj, noticeId: extractNoticeIdFromDetail(detailObj, raw) };
+  }
+
+  // Build a fully-populated row from a per-notice detail record.
+  function detailDocToRow(doc) {
+    var did = doc.noticeId || '';
+    var row = normalizeStoredRow(['', '', did ? 'https://www.thegazette.co.uk/notice/' + did : '', '', did, '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    if (!row) return null;
+    applyGazetteNoticeDetail(row, doc.detailJson);
+    return row;
+  }
 
   function refreshPasteStagedStatus() {
     var pages = stagedPastedPages.length;
     var total = stagedPastedPages.reduce(function(a, p) { return a + (p.count || 0); }, 0);
+    var details = stagedDetailDocs.length;
     var $s = $('#pasteStagedStatus');
-    if (pages === 0) {
-      $s.text('No pages staged yet.').css('color', '#5a6c7d');
-    } else {
-      $s.text(pages + ' page(s) staged — ' + total + ' total notice entries ready to process.').css('color', '#27ae60');
+    if (pages === 0 && details === 0) {
+      $s.text('Nothing staged yet.').css('color', '#5a6c7d');
+      return;
     }
+    var parts = [];
+    if (pages) parts.push(pages + ' feed page(s) — ' + total + ' notice entries');
+    if (details) parts.push(details + ' per-notice detail record(s)');
+    $s.text(parts.join(' · ') + ' staged.').css('color', '#27ae60');
   }
 
   var pasteNextPage = 1;
@@ -2800,81 +2934,315 @@ window.crmLookup = function(companyNum) {
   $endDate.on('change', function() { pasteNextPage = 1; updatePasteSourceLink(); });
   updatePasteSourceLink();
 
-  $('#addPastedPage').on('click', function() {
-    var raw = $('#pasteJson').val().trim();
-    if (!raw) { alert('Paste a page of Gazette JSON first.'); return; }
+  // ── One-shot "Collect Gazette day" bookmarklet ──────────────
+  // Runs on a thegazette.co.uk tab (where the WAF challenge is already solved, so
+  // same-origin fetches succeed). Pulls the feed for a date range + every
+  // administration notice's full linked-data record, and copies a single
+  // { format:'gazette-bundle', feed, details } blob to the clipboard for one paste.
+  // NOTE: must be fully self-contained — it is serialized via .toString().
+  async function gazetteBundleCollector() {
+    if (!/(^|\.)thegazette\.co\.uk$/.test(location.hostname)) {
+      alert('Open https://www.thegazette.co.uk first, then click this bookmarklet there.');
+      return;
+    }
+    var ADMIN = { '2410': 1, '2411': 1, '2412': 1, '2413': 1, '2414': 1 };
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function todayStr() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+    var start = prompt('Collect Gazette administrations — START date (YYYY-MM-DD):', todayStr());
+    if (!start) return;
+    var end = prompt('END date (YYYY-MM-DD):', start) || start;
+
+    var box = document.createElement('div');
+    box.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;background:#0f1923;color:#e8edf3;font:13px/1.5 system-ui,Segoe UI,sans-serif;padding:14px 16px;border-radius:8px;box-shadow:0 6px 28px rgba(0,0,0,.55);max-width:360px;';
+    document.body.appendChild(box);
+    var say = function(m) { box.textContent = m; };
+
+    async function getJson(url) {
+      var r = await fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' } });
+      if (!r.ok) throw new Error('HTTP ' + r.status + ' on ' + url);
+      return r.json();
+    }
+
     try {
-      var json = JSON.parse(raw);
-      var entries = json.entry || json.entries || json.items || [];
-      if (!Array.isArray(entries)) entries = [entries];
-      if (!entries.length) { alert('Pasted JSON has no entries. Make sure you copied the full response.'); return; }
-      stagedPastedPages.push({ entries: entries, count: entries.length });
-      $('#pasteJson').val('');
-      pasteNextPage++;
-      updatePasteSourceLink();
-      refreshPasteStagedStatus();
+      var feed = [], page = 1, totalPages = 1;
+      while (page <= totalPages) {
+        say('Fetching feed page ' + page + ' of ' + totalPages + '…');
+        var fu = location.origin + '/insolvency/notice/data.json?results-page-size=50&sort-by=latest-date&results-page=' + page + '&start-publish-date=' + start + '&end-publish-date=' + end;
+        var fj = await getJson(fu);
+        if (page === 1) {
+          var total = parseInt(fj['f:total'] || '0', 10) || 0;
+          var size = parseInt(fj['f:page-size'] || '50', 10) || 50;
+          totalPages = total ? Math.ceil(total / size) : 1;
+        }
+        var ents = fj.entry ? (Array.isArray(fj.entry) ? fj.entry : [fj.entry]) : [];
+        feed = feed.concat(ents);
+        page++;
+      }
+      var admin = feed.filter(function(e) { return ADMIN[String(e['f:notice-code'] || '')]; });
+      var details = [];
+      for (var i = 0; i < admin.length; i++) {
+        var idm = String(admin[i].id || '').match(/(\d+)\s*$/);
+        var id = idm ? idm[1] : '';
+        if (!id) continue;
+        say('Full record ' + (i + 1) + ' of ' + admin.length + ' (notice ' + id + ')…');
+        try { details.push(await getJson(location.origin + '/notice/' + id + '/data.json?view=linked-data')); }
+        catch (e) { /* skip a single failure, keep going */ }
+        await new Promise(function(res) { setTimeout(res, 250); });
+      }
+      var bundle = { format: 'gazette-bundle', generated: todayStr(), start: start, end: end, feed: admin, details: details };
+      var text = JSON.stringify(bundle);
+      var done = 'Collected ' + admin.length + ' administration notice(s) + ' + details.length + ' full record(s).';
+      try {
+        await navigator.clipboard.writeText(text);
+        say(done + ' Copied to clipboard (' + text.length + ' chars). Paste it into the dashboard and click Process.');
+      } catch (e) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:64px;right:16px;width:360px;height:220px;z-index:2147483647;';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        say(done + ' Clipboard was blocked — Ctrl+A then Ctrl+C the box below, then paste into the dashboard.');
+      }
+      setTimeout(function() { box.remove(); }, 15000);
+    } catch (err) {
+      say('Error: ' + err.message);
+    }
+  }
+
+  (function wireBundleBookmarklet() {
+    var $a = $('#bundleBookmarklet');
+    if (!$a.length) return;
+    var src = '(' + gazetteBundleCollector.toString() + ')();';
+    $a.attr('href', 'javascript:' + encodeURIComponent(src));
+    // The dashboard isn't on the Gazette origin, so clicking it here can't work —
+    // it's meant to be dragged to the bookmarks bar and clicked on thegazette.co.uk.
+    $a.on('click', function(e) {
+      e.preventDefault();
+      alert('Drag this link to your bookmarks bar, then click it while on a thegazette.co.uk tab. (It can\'t run from here.)');
+    });
+  })();
+
+  // ── "Copy Collector Script" button (Step 1) ─────────────────
+  // Copies the exact collector code (same source as the bookmarklet) so the user
+  // can paste it into the browser console on thegazette.co.uk. Single source of
+  // truth — derived from gazetteBundleCollector via .toString().
+  (function wireCopyCollector() {
+    var $btn = $('#copyCollectorBtn');
+    var $st = $('#copyCollectorStatus');
+    if (!$btn.length) return;
+    var script = '(' + gazetteBundleCollector.toString() + ')();';
+
+    function flash(msg, ok) {
+      $st.text(msg).css('color', ok ? '#27ae60' : '#c0392b');
+    }
+
+    function fallbackCopy() {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = script;
+        ta.style.cssText = 'position:fixed;top:-2000px;left:-2000px;';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) { return false; }
+    }
+
+    $btn.on('click', function() {
+      var onOk = function() { flash('✓ Copied! Now: thegazette.co.uk → press F12 → Console → Ctrl+V → Enter.', true); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(script).then(onOk, function() {
+          flash(fallbackCopy() ? '✓ Copied! thegazette.co.uk → F12 → Console → Ctrl+V → Enter.' : 'Could not copy automatically — open "Other ways" below and copy the script there.', false);
+        });
+      } else {
+        flash(fallbackCopy() ? '✓ Copied! thegazette.co.uk → F12 → Console → Ctrl+V → Enter.' : 'Could not copy automatically — open "Other ways" below and copy the script there.', false);
+      }
+    });
+  })();
+
+  // Stage one pasted blob (feed page OR per-notice detail record). Returns true on success.
+  function stagePastedBlob(rawText) {
+    var info;
+    try {
+      info = classifyPastedJson(rawText);
     } catch (e) {
       alert('JSON parse error: ' + e.message);
+      return false;
+    }
+    if (info.type === 'feed') {
+      if (!info.entries.length) { alert('Pasted feed JSON has no entries. Make sure you copied the full response.'); return false; }
+      stagedPastedPages.push({ entries: info.entries, count: info.entries.length });
+      pasteNextPage++;
+      updatePasteSourceLink();
+      return true;
+    }
+    if (info.type === 'detail') {
+      if (!info.noticeId) { alert('Could not find a Notice ID in that detail record. Make sure you copied the full ...?view=linked-data response.'); return false; }
+      stagedDetailDocs.push({ detailJson: info.detailJson, noticeId: info.noticeId });
+      return true;
+    }
+    if (info.type === 'bundle') {
+      var stagedAny = false;
+      if (info.entries.length) {
+        stagedPastedPages.push({ entries: info.entries, count: info.entries.length });
+        stagedAny = true;
+      }
+      for (var bi = 0; bi < info.details.length; bi++) {
+        var doc = makeDetailDoc(info.details[bi]);
+        if (doc.noticeId) { stagedDetailDocs.push(doc); stagedAny = true; }
+      }
+      if (!stagedAny) { alert('Bundle contained no feed entries or detail records.'); return false; }
+      return true;
+    }
+    alert('Unrecognized JSON. Paste a bundle (from the bookmarklet), a feed list (data.json), or a single notice detail (data.json?view=linked-data).');
+    return false;
+  }
+
+  $('#addPastedPage').on('click', function() {
+    var raw = $('#pasteJson').val().trim();
+    if (!raw) { alert('Paste Gazette JSON first.'); return; }
+    if (stagePastedBlob(raw)) {
+      $('#pasteJson').val('');
+      refreshPasteStagedStatus();
     }
   });
 
   $('#clearPastedPages').on('click', function() {
-    stagedPastedPages = [];
     $('#pasteJson').val('');
-    pasteNextPage = 1;
-    updatePasteSourceLink();
-    refreshPasteStagedStatus();
+    var $d = $('#pasteDiag'); if ($d.length) $d.html('');
+    var $s = $('#pasteStagedStatus'); if ($s.length) $s.text('Paste the JSON above, then click Load Into Table.').css('color', '#5a6c7d');
   });
 
+  // ── Load Into Table — the single, explicit action (with diagnostics) ──────
+  // Reads whatever is in the paste box (a notice list, a single notice's detail
+  // record, or a bundle), loads the administration notices, and — when nothing
+  // loads — says exactly WHY in the line below the buttons instead of failing
+  // silently. The diagnostics surface the JSON's shape and the notice codes it
+  // contains, which is what we need to adapt to the Gazette's new site.
   $('#parsePasted').on('click', async function() {
-    // If user clicked Process without staging, treat the textarea as a single page.
-    var pages = stagedPastedPages.slice();
-    var raw = $('#pasteJson').val().trim();
-    if (raw) {
-      try {
-        var json = JSON.parse(raw);
-        var ents = json.entry || json.entries || json.items || [];
-        if (!Array.isArray(ents)) ents = [ents];
-        if (ents.length) pages.push({ entries: ents, count: ents.length });
-      } catch (e) {
-        alert('JSON parse error on the current paste: ' + e.message);
-        return;
-      }
-    }
-    if (pages.length === 0) { alert('Stage at least one page first (Add Page), or paste JSON in the box and click Process.'); return; }
+    var $diag = $('#pasteDiag');
+    var $st = $('#pasteStagedStatus');
+    function status(t, color) { if ($st.length) $st.text(t).css('color', color || '#5a6c7d'); }
+    function diag(html, color) { if ($diag.length) $diag.html(html).css('color', color || '#5a6c7d'); }
 
-    // Parse all entries from all staged pages, filter to administration codes
-    var ADMIN_CODES = {'2410':1, '2411':1, '2412':1, '2413':1, '2414':1};
-    var notices = [];
-    var skipped = 0;
-    for (var p = 0; p < pages.length; p++) {
-      var ents2 = pages[p].entries || [];
-      for (var i = 0; i < ents2.length; i++) {
-        var code = ents2[i]['f:notice-code'] || '';
-        // If a notice-code is present and it's not an admin code, skip; otherwise parse.
-        if (code && !ADMIN_CODES[code]) { skipped++; continue; }
-        var row = parseNoticeEntry(ents2[i]);
-        if (row && row[COL.NOTICE_ID]) notices.push(row);
-      }
-    }
-
-    if (notices.length === 0) {
-      alert('No administration notices found in the pasted pages. ' + skipped + ' non-admin notices were skipped.');
+    var raw = ($('#pasteJson').val() || '').trim();
+    if (!raw) {
+      status('Paste the JSON into the box first, then click Load Into Table.', '#c0392b');
+      diag('');
       return;
     }
 
-    showProgress('Parsed <strong>' + notices.length + '</strong> notices from <strong>' + pages.length + '</strong> staged page(s). Skipping per-notice detail enrichment (WAF blocks it). Running Companies House enrichment if configured...', 50);
+    // 1) Must parse as JSON.
+    var json;
+    try { json = JSON.parse(raw); }
+    catch (e) {
+      status('That text is not valid JSON.', '#c0392b');
+      diag('&#10060; Could not read that as JSON. The Gazette page may have shown a formatted or HTML view &mdash; make sure you copied the whole page and that it begins with a &ldquo;{&rdquo;.<br>First characters received: <code>' + escapeHtml(raw.slice(0, 80)) + '</code>', '#c0392b');
+      return;
+    }
 
-    // Skip hydrateNoticesWithGazetteDetails — those endpoints are also WAF-blocked.
-    // The feed-content HTML parsing in parseNoticeEntry already captures the main fields.
-    var enriched = await enrichNoticesWithCompaniesHouse(notices);
-    mergeAndRefresh(enriched);
+    // 2) Identify the shape (feed list, single detail, or bundle), with diagnostics.
+    var entries = json.entry || json.entries || json.items;
+    var bundleDetails = (json.format === 'gazette-bundle' && Array.isArray(json.details)) ? json.details : null;
+    if (json.format === 'gazette-bundle' && Array.isArray(json.feed)) entries = json.feed;
+    if (entries && !Array.isArray(entries)) entries = [entries];
+    var isDetail = json.result && json.result.primaryTopic;
 
-    // Clear staged after successful processing
-    stagedPastedPages = [];
-    pasteNextPage = 1;
-    updatePasteSourceLink();
-    refreshPasteStagedStatus();
+    var feedRows = [];
+    var detailRows = [];
+    var codesSeen = {};
+    var skipped = 0;
+
+    function addFeedEntries(list) {
+      (list || []).forEach(function(en) {
+        var code = String(en['f:notice-code'] || en['notice-code'] || '');
+        if (code) codesSeen[code] = (codesSeen[code] || 0) + 1;
+        if (code && !ADMIN_NOTICE_CODES[code]) { skipped++; return; }
+        var row = parseNoticeEntry(en);
+        if (row && row[COL.NOTICE_ID]) feedRows.push(row);
+      });
+    }
+
+    if (entries && entries.length) {
+      addFeedEntries(entries);
+      (bundleDetails || []).forEach(function(d) {
+        var doc = makeDetailDoc(d);
+        if (!doc.noticeId) return;
+        var ddr = detailDocToRow(doc);
+        if (ddr && ddr[COL.NOTICE_ID]) detailRows.push(ddr);
+      });
+    } else if (isDetail) {
+      json.__raw = raw;
+      var nid = extractNoticeIdFromDetail(json, raw);
+      if (nid) {
+        var dr = detailDocToRow({ detailJson: json, noticeId: nid });
+        if (dr && dr[COL.NOTICE_ID]) detailRows.push(dr);
+      } else {
+        status('That looks like a notice record, but I could not find its Notice ID.', '#c0392b');
+        diag('&#9888;&#65039; This is a notice detail record, but no Notice ID was found. Make sure you copied the full <code>?view=linked-data</code> response.', '#c0392b');
+        return;
+      }
+    } else {
+      var keys = Object.keys(json).slice(0, 12).join(', ');
+      status('Read the JSON, but its shape is not recognized.', '#c0392b');
+      diag('&#9888;&#65039; Loaded valid JSON, but it is not a notice list or a notice record I recognize.<br>Top-level keys: <code>' + escapeHtml(keys) + '</code><br>Copy this line and send it to me &mdash; I will adjust the parser to match the new site.', '#c0392b');
+      return;
+    }
+
+    // Distinguish a notice LIST (paginate, keep administrations) from a single
+    // detail record (just merge it). Administrations are sparse among the
+    // high-volume liquidation notices, so a page with none is normal — we guide
+    // to the next page rather than calling it a failure.
+    var isFeed = !!(entries && entries.length);
+
+    if (isFeed) {
+      var total = parseInt(json['f:total'], 10);
+      var pageSize = parseInt(json['f:page-size'], 10) || entries.length || 1;
+      var pageNum = parseInt(json['f:page-number'], 10) || mfPage;
+      var totalPages = (isFinite(total) && total >= 0 && pageSize > 0) ? Math.max(1, Math.ceil(total / pageSize)) : null;
+      var more = (totalPages != null) ? (pageNum < totalPages) : (entries.length >= pageSize && entries.length >= 50);
+      var pageLabel = (totalPages != null) ? ('page ' + pageNum + ' of ' + totalPages) : ('page ' + pageNum);
+      var codeList = Object.keys(codesSeen).map(function(c) { return c + ' (&times;' + codesSeen[c] + ')'; }).join(', ') || 'none';
+
+      // Point the Step 1 link at the next page (or reset to 1 when finished).
+      mfPage = more ? (pageNum + 1) : 1;
+      if (typeof mfUpdateLink === 'function') mfUpdateLink();
+
+      if (feedRows.length > 0) {
+        showProgress('Loading <strong>' + feedRows.length + '</strong> administration notice(s)...', 50);
+        var enrichedF = await enrichNoticesWithCompaniesHouse(feedRows.concat(detailRows));
+        mergeAndRefresh(enrichedF);
+        $('#pasteJson').val('');
+        status('Loaded ' + feedRows.length + ' administration notice(s) — ' + pageLabel + '. ' + detailsProgressText() + '.', '#27ae60');
+        diag(more
+          ? '&#9989; Kept ' + feedRows.length + ' administration(s) from ' + entries.length + ' notices on this page. <strong>More pages remain</strong> &mdash; the Step 1 link now points to page ' + mfPage + '. Open, copy and paste it here too.'
+          : '&#9989; That was the last page for this date range &mdash; all administrations are loaded.',
+          more ? '#b9770e' : '#1e8e4e');
+      } else if (isFinite(total) && total === 0) {
+        status('No insolvency notices for that date range.', '#c0392b');
+        diag('&#9888;&#65039; The Gazette returned 0 notices for this range. Check the dates &mdash; a future date, weekend, or a day with nothing published yet comes back empty.', '#c0392b');
+      } else if (more) {
+        status('No administrations on ' + pageLabel + ' &mdash; open the next page.', '#b9770e');
+        diag('Scanned ' + entries.length + ' notices on this page (liquidations etc.). Administrations are spread through the list &mdash; the Step 1 link now points to page ' + mfPage + '. Open, copy and paste it. Codes here: <code>' + escapeHtml(codeList) + '</code>');
+      } else {
+        status('Scanned the whole date range &mdash; no administrations found.', '#c0392b');
+        diag('&#9888;&#65039; Found no administrations (codes 2410&ndash;2414) anywhere in this date range. Codes on the last page: <code>' + escapeHtml(codeList) + '</code>');
+      }
+      return;
+    }
+
+    // Single notice detail record (Step 3).
+    if (detailRows.length > 0) {
+      var enrichedD = await enrichNoticesWithCompaniesHouse(detailRows);
+      mergeAndRefresh(enrichedD);
+      $('#pasteJson').val('');
+      status('Detail merged. ' + detailsProgressText() + '.', '#27ae60');
+      diag('');
+      return;
+    }
+
+    status('Nothing to load from that paste.', '#c0392b');
+    diag('&#9888;&#65039; No notices or detail records were found in that paste.', '#c0392b');
   });
 
   // ── Export Functions ─────────────────────────────────────
@@ -2966,6 +3334,200 @@ window.crmLookup = function(companyNum) {
     a.click();
     URL.revokeObjectURL(url);
   });
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  Manual-paste helpers — the WAF blocks background fetches, so notices come
+  //  in by paste. The feed list fills the basic columns; each notice's full
+  //  record (…/notice/{ID}/data.json?view=linked-data) fills Date of
+  //  Appointment, Administrators and addresses. A row counts as "missing its
+  //  detail" until it has a Date of Appointment. This panel lists those rows,
+  //  links straight to each record, tracks progress, and any paste auto-merges.
+  // ════════════════════════════════════════════════════════════════════════
+  var ADMIN_NOTICE_CODES = { '2410': 1, '2411': 1, '2412': 1, '2413': 1, '2414': 1 };
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function detailUrlForNotice(id) {
+    return 'https://www.thegazette.co.uk/notice/' + id + '/data.json?view=linked-data';
+  }
+
+  function trackedNotices() {
+    return loadData().filter(function(r) { return r && r[COL.NOTICE_ID]; });
+  }
+
+  // Date of Appointment is the most reliable "have we captured the detail?" signal:
+  // the feed teaser never carries it, every administration detail record does.
+  function noticeNeedsDetail(row) {
+    return !cleanText(row[COL.DATE_APPT]);
+  }
+
+  function detailsProgressText() {
+    var all = trackedNotices();
+    var captured = all.filter(function(r) { return !noticeNeedsDetail(r); }).length;
+    return captured + ' of ' + all.length + ' details captured';
+  }
+
+  function renderDetailsPanel() {
+    var $panel = $('#detailsPanel');
+    if (!$panel.length) return;
+    var all = trackedNotices();
+    if (all.length === 0) { $panel.hide(); return; }
+    $panel.show();
+
+    var need = all.filter(noticeNeedsDetail);
+    var captured = all.length - need.length;
+    var pct = all.length ? Math.round((captured / all.length) * 100) : 0;
+    $('#detailsCount').text(captured + ' / ' + all.length);
+    $('#detailsBar').css('width', pct + '%');
+
+    var $list = $('#detailsList').empty();
+    if (need.length === 0) {
+      $('#detailsActions').hide();
+      $list.html('<div style="color:#1e8e4e; font-weight:600; padding:10px 0;">&#10003; All details captured for the notices loaded. You\'re done for this batch.</div>');
+      return;
+    }
+    $('#detailsActions').show();
+
+    $list.append($('<div></div>')
+      .css({ fontSize: '12px', color: '#5a6c7d', margin: '0 0 8px' })
+      .text('Click a company to open its full record in a new tab, then Ctrl+A, Ctrl+C, and paste it in the box above. ' + need.length + ' to go.'));
+
+    need.forEach(function(r) {
+      var id = r[COL.NOTICE_ID];
+      var name = cleanText(r[COL.COMPANY_NAME]) || ('Notice ' + id);
+      var $row = $('<div></div>').css({
+        padding: '6px 0', borderBottom: '1px solid #eef1f4',
+        display: 'flex', gap: '8px', alignItems: 'baseline'
+      });
+      $row.append($('<a target="_blank" rel="noopener"></a>')
+        .attr('href', detailUrlForNotice(id))
+        .text(name)
+        .css({ color: '#2980b9', fontWeight: 600, textDecoration: 'none', flex: '1 1 auto', minWidth: 0, wordBreak: 'break-word' }));
+      $row.append($('<span></span>').text('notice ' + id)
+        .css({ color: '#9fb3c8', fontSize: '12px', flex: '0 0 auto' }));
+      $list.append($row);
+    });
+  }
+
+  // Process one pasted blob immediately (feed page, a single detail record, or a
+  // bundle). Mirrors the Load-Into-Table path but skips staging, so each paste
+  // merges on arrival. Returns true if anything usable was merged.
+  var autoPasteBusy = false;
+  async function processPastedBlob(rawText) {
+    if (autoPasteBusy) return false;
+    var info;
+    try { info = classifyPastedJson(rawText); }
+    catch (e) { return false; }  // not valid JSON yet — stay quiet for auto-paste
+
+    var feedRows = [];
+    var detailRows = [];
+
+    function addFeedEntries(entries) {
+      (entries || []).forEach(function(en) {
+        var code = en['f:notice-code'] || '';
+        if (code && !ADMIN_NOTICE_CODES[code]) return;  // administration notices only
+        var row = parseNoticeEntry(en);
+        if (row && row[COL.NOTICE_ID]) feedRows.push(row);
+      });
+    }
+
+    if (info.type === 'feed') {
+      addFeedEntries(info.entries);
+    } else if (info.type === 'detail') {
+      if (!info.noticeId) return false;
+      var dr = detailDocToRow({ detailJson: info.detailJson, noticeId: info.noticeId });
+      if (dr && dr[COL.NOTICE_ID]) detailRows.push(dr);
+    } else if (info.type === 'bundle') {
+      addFeedEntries(info.entries);
+      (info.details || []).forEach(function(d) {
+        var doc = makeDetailDoc(d);
+        if (!doc.noticeId) return;
+        var ddr = detailDocToRow(doc);
+        if (ddr && ddr[COL.NOTICE_ID]) detailRows.push(ddr);
+      });
+    } else {
+      return false;
+    }
+
+    if (feedRows.length === 0 && detailRows.length === 0) return false;
+
+    autoPasteBusy = true;
+    try {
+      var combined = feedRows.concat(detailRows);  // detail rows merge on top by Notice ID
+      var enriched = await enrichNoticesWithCompaniesHouse(combined);
+      mergeAndRefresh(enriched);
+    } finally {
+      autoPasteBusy = false;
+    }
+    return true;
+  }
+
+  // (Auto-load on paste was removed — "Load Into Table" is now the single,
+  //  explicit action, which is the predictable model requested.)
+
+  // ── Step 1 feed link: date range + pagination ────────────────────────────
+  // noticetype/categorycode URL filters are ignored by the Gazette API, so we
+  // pull the full insolvency list for the chosen date range and keep only
+  // administrations (codes 2410–2414) client-side on load. The link advances a
+  // page each time you load one; the feed's own f:total drives the page count.
+  var mfPage = 1;
+  function mfBuildUrl() {
+    var s = ($('#mfStart').val() || '').trim();
+    var e = ($('#mfEnd').val() || '').trim();
+    var url = 'https://www.thegazette.co.uk/insolvency/notice/data.json'
+      + '?results-page-size=500&sort-by=latest-date&results-page=' + mfPage;
+    if (s) url += '&start-publish-date=' + s;
+    if (e) url += '&end-publish-date=' + e;
+    return url;
+  }
+  function mfUpdateLink() {
+    var $a = $('#feedUrlLink');
+    if (!$a.length) return;
+    $a.attr('href', mfBuildUrl());
+    var s = ($('#mfStart').val() || '').trim();
+    var e = ($('#mfEnd').val() || '').trim();
+    var range = s ? (e && e !== s ? s + ' to ' + e : s) : 'the latest notices';
+    $a.html('<strong>the Gazette insolvency list for ' + escapeHtml(range) + (mfPage > 1 ? ', page ' + mfPage : '') + '</strong>');
+  }
+  (function mfInit() {
+    if (typeof dayjs === 'function') {
+      var today = dayjs().format('YYYY-MM-DD');
+      if ($('#mfStart').length && !$('#mfStart').val()) $('#mfStart').val(today);
+      if ($('#mfEnd').length && !$('#mfEnd').val()) $('#mfEnd').val(today);
+    }
+    mfPage = 1;
+    mfUpdateLink();
+  })();
+  $('#mfStart, #mfEnd').on('change', function() { mfPage = 1; mfUpdateLink(); });
+
+  // Copy every remaining detail link at once, for opening in bulk.
+  $('#copyDetailLinks').on('click', function() {
+    var need = trackedNotices().filter(noticeNeedsDetail);
+    if (need.length === 0) return;
+    var urls = need.map(function(r) { return detailUrlForNotice(r[COL.NOTICE_ID]); }).join('\n');
+    var btn = this;
+    var done = function() {
+      btn.textContent = 'Copied ' + need.length + ' links';
+      setTimeout(function() { btn.textContent = 'Copy all remaining links'; }, 1600);
+    };
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = urls; ta.style.cssText = 'position:fixed;top:-2000px;left:-2000px;';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+      document.body.removeChild(ta); done();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(urls).then(done, fallback);
+    } else {
+      fallback();
+    }
+  });
+
+  // Initial paint of the details checklist.
+  renderDetailsPanel();
 
 })();
 </script>
