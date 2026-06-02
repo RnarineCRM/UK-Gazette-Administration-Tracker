@@ -695,10 +695,21 @@ table.dataTable a.notice-link:hover {
 
   <!-- ── Manual Paste Fallback ── -->
   <div id="pasteArea" style="display:none; background:#fff; border:1px solid #dde2e8; border-radius:6px; padding:16px; margin-bottom:12px;">
-    <p style="margin-bottom:8px; font-weight:600; color:#1a1a2e;">Manual JSON Paste (CORS fallback)</p>
-    <p style="margin-bottom:8px; font-size:12px; color:#5a6c7d;">Open <a href="https://www.thegazette.co.uk/insolvency/notice/data.json?noticetype=2410&results-page-size=50&sort-by=latest-date" target="_blank" rel="noopener">this Gazette JSON URL</a> in a new tab, copy the entire response, and paste it below:</p>
+    <p style="margin-bottom:8px; font-weight:600; color:#1a1a2e;">Manual JSON Paste (AWS WAF fallback)</p>
+    <p style="margin-bottom:6px; font-size:12px; color:#5a6c7d;">The Gazette now blocks direct background fetches with an AWS WAF JavaScript challenge. A real browser tab solves the challenge automatically, so manual paste still works:</p>
+    <ol style="margin:0 0 10px 22px; font-size:12px; color:#5a6c7d; line-height:1.6;">
+      <li>Open <a id="pasteSourceLink" href="https://www.thegazette.co.uk/insolvency/notice/data.json?results-page-size=50&sort-by=latest-date" target="_blank" rel="noopener">the Gazette JSON URL for your selected date range</a> in a new tab. Wait for the JSON to render.</li>
+      <li>Press <strong>Ctrl+A</strong>, then <strong>Ctrl+C</strong> to copy the entire response.</li>
+      <li>Paste below and click <strong>Add Page</strong>. Repeat for each result page (50 notices per page) until you have them all, then click <strong>Process Pages</strong>.</li>
+    </ol>
+    <p style="margin:0 0 6px 0; font-size:12px; color:#5a6c7d;">Per-notice detail enrichment is also WAF-blocked, so this fallback uses the data embedded in each feed entry. Companies House enrichment still runs if an API key is configured.</p>
     <textarea id="pasteJson" style="width:100%; height:120px; font-family:Consolas,monospace; font-size:12px; border:1px solid #c8d6e5; border-radius:4px; padding:8px;" placeholder="Paste Gazette JSON response here..."></textarea>
-    <button class="btn-primary" id="parsePasted" style="margin-top:8px;">Parse Pasted JSON</button>
+    <div style="margin-top:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+      <button class="btn-primary" id="addPastedPage">Add Page</button>
+      <button class="btn-primary" id="parsePasted">Process Pages</button>
+      <button class="btn-danger" id="clearPastedPages" style="background:#7f8c8d;">Clear Staged</button>
+      <span id="pasteStagedStatus" style="font-size:12px; color:#5a6c7d;">No pages staged yet.</span>
+    </div>
   </div>
 
   <!-- ── Summary Stats ── -->
@@ -1436,51 +1447,81 @@ window.crmLookup = function(companyNum) {
   ];
   var corsMode = 'unknown'; // 'unknown' | 'direct' | proxy index (0,1,2)
 
+  // AWS WAF challenge detection. The Gazette put their site behind AWS WAF in
+  // 2026, so background fetch() calls now receive HTTP 202 with an empty body
+  // and header `x-amzn-waf-action: challenge` instead of the JSON payload.
+  // Treat those responses as failures so the proxy cycle continues, then
+  // surface a specific error for the caller.
+  function isWafChallengeResponse(resp) {
+    if (!resp) return false;
+    try {
+      if (resp.headers && typeof resp.headers.get === 'function' &&
+          resp.headers.get('x-amzn-waf-action') === 'challenge') return true;
+    } catch (e) { /* ignore */ }
+    // Direct from CloudFront the challenge is always 202 + empty body.
+    // Status 202 alone is normally "accepted, processing"; combined with a zero
+    // content-length it's the WAF challenge fingerprint.
+    if (resp.status === 202) {
+      try {
+        var lenHeader = resp.headers && typeof resp.headers.get === 'function' ? resp.headers.get('content-length') : null;
+        if (lenHeader === '0' || lenHeader === 0) return true;
+      } catch (e) { /* ignore */ }
+    }
+    return false;
+  }
+
+  function makeWafError() {
+    var err = new Error('Blocked by AWS WAF (x-amzn-waf-action: challenge). The Gazette now serves a JavaScript bot challenge on every API endpoint, which background fetches cannot solve.');
+    err.wafBlocked = true;
+    return err;
+  }
+
   async function fetchWithCors(url) {
+    var sawWaf = false;
+    var lastErr = null;
+
+    async function attempt(u, fetcher) {
+      try {
+        var r = await fetch(u);
+        if (isWafChallengeResponse(r)) { sawWaf = true; return null; }
+        return r;
+      } catch (e) { lastErr = e; return null; }
+    }
+
     // If direct works, use it
     if (corsMode === 'direct') {
-      var resp = await fetch(url);
-      if (resp.ok || (resp.status >= 300 && resp.status < 400)) return resp;
+      var resp = await attempt(url);
+      if (resp && (resp.ok || (resp.status >= 300 && resp.status < 400))) return resp;
       // Direct gave a server error — maybe transient, try proxies
     }
 
     // If a proxy is known good, try it first
     if (typeof corsMode === 'number') {
-      try {
-        var proxyResp = await fetch(CORS_PROXIES[corsMode](url));
-        if (proxyResp.ok) return proxyResp;
-      } catch (e) { /* fall through to full scan */ }
-      // Preferred proxy failed — reset and scan all
+      var proxyResp = await attempt(CORS_PROXIES[corsMode](url));
+      if (proxyResp && proxyResp.ok) return proxyResp;
       corsMode = 'unknown';
     }
 
     // Unknown or recovery: try direct then each proxy
     if (corsMode === 'unknown' || corsMode === 'direct') {
-      try {
-        var directResp = await fetch(url);
-        if (directResp.ok) { corsMode = 'direct'; return directResp; }
-      } catch (e) {
-        console.warn('Direct fetch failed (CORS likely):', e.message);
-      }
+      var directResp = await attempt(url);
+      if (directResp && directResp.ok) { corsMode = 'direct'; return directResp; }
     }
 
     // Try each proxy in order
     for (var i = 0; i < CORS_PROXIES.length; i++) {
-      try {
-        var pResp = await fetch(CORS_PROXIES[i](url));
-        if (pResp.ok) {
-          corsMode = i;
-          console.log('Using CORS proxy #' + i);
-          return pResp;
-        }
-        console.warn('CORS proxy #' + i + ' returned HTTP ' + pResp.status);
-      } catch (e) {
-        console.warn('CORS proxy #' + i + ' failed:', e.message);
+      var pResp = await attempt(CORS_PROXIES[i](url));
+      if (pResp && pResp.ok) {
+        corsMode = i;
+        console.log('Using CORS proxy #' + i);
+        return pResp;
       }
+      if (pResp) console.warn('CORS proxy #' + i + ' returned HTTP ' + pResp.status);
     }
 
-    // All proxies failed — return last attempt so caller sees the error
-    throw new Error('All fetch methods failed (direct + ' + CORS_PROXIES.length + ' proxies). The Gazette may be temporarily unavailable.');
+    // All methods failed
+    if (sawWaf) throw makeWafError();
+    throw lastErr || new Error('All fetch methods failed (direct + ' + CORS_PROXIES.length + ' proxies). The Gazette may be temporarily unavailable.');
   }
 
   // ── Helpers ────────────────────────────────────────────
@@ -2451,7 +2492,12 @@ window.crmLookup = function(companyNum) {
 
     } catch (err) {
       console.error('Gazette fetch error:', err);
-      showProgress('<strong>Error:</strong> ' + err.message + '<br>You can use the <strong>Manual JSON Paste</strong> fallback below, or try the <strong>Debug API</strong> button.', 0);
+      var isWaf = err && (err.wafBlocked || /WAF|x-amzn-waf|Unexpected end of JSON/i.test(err.message || ''));
+      var msg = isWaf
+        ? '<strong>Blocked by The Gazette\'s new AWS WAF bot challenge.</strong> Background fetches cannot pass the JavaScript challenge. Use the <strong>Manual JSON Paste</strong> panel below — opening the URL in a real browser tab solves the challenge automatically. See guidance in the panel.'
+        : '<strong>Error:</strong> ' + err.message + '<br>You can use the <strong>Manual JSON Paste</strong> fallback below, or try the <strong>Debug API</strong> button.';
+      showProgress(msg, 0);
+      updatePasteSourceLink();
       $('#pasteArea').show();
       fetchInProgress = false;
       setFetchButtons(false);
@@ -2725,40 +2771,110 @@ window.crmLookup = function(companyNum) {
     $pasteArea.show();
   });
 
-  // ── Manual Paste Handler ───────────────────────────────
-  $('#parsePasted').on('click', async function() {
+  // ── Manual Paste Handler (multi-page staging for WAF fallback) ──
+  var stagedPastedPages = []; // array of { entries: [...], count: N }
+
+  function refreshPasteStagedStatus() {
+    var pages = stagedPastedPages.length;
+    var total = stagedPastedPages.reduce(function(a, p) { return a + (p.count || 0); }, 0);
+    var $s = $('#pasteStagedStatus');
+    if (pages === 0) {
+      $s.text('No pages staged yet.').css('color', '#5a6c7d');
+    } else {
+      $s.text(pages + ' page(s) staged — ' + total + ' total notice entries ready to process.').css('color', '#27ae60');
+    }
+  }
+
+  var pasteNextPage = 1;
+
+  function updatePasteSourceLink() {
+    var base = 'https://www.thegazette.co.uk/insolvency/notice/data.json?results-page-size=50&sort-by=latest-date&results-page=' + pasteNextPage;
+    var s = $startDate.val();
+    var e = $endDate.val();
+    if (s) base += '&start-publish-date=' + s;
+    if (e) base += '&end-publish-date=' + e;
+    $('#pasteSourceLink').attr('href', base).text('the Gazette JSON URL for ' + (s ? s : 'all') + (e && e !== s ? ' → ' + e : '') + ' (page ' + pasteNextPage + ')');
+  }
+
+  $startDate.on('change', function() { pasteNextPage = 1; updatePasteSourceLink(); });
+  $endDate.on('change', function() { pasteNextPage = 1; updatePasteSourceLink(); });
+  updatePasteSourceLink();
+
+  $('#addPastedPage').on('click', function() {
     var raw = $('#pasteJson').val().trim();
-    if (!raw) { alert('Please paste JSON data first.'); return; }
+    if (!raw) { alert('Paste a page of Gazette JSON first.'); return; }
     try {
       var json = JSON.parse(raw);
       var entries = json.entry || json.entries || json.items || [];
       if (!Array.isArray(entries)) entries = [entries];
-      debugLog('');
-      debugLog('--- Parsing pasted JSON ---');
-      debugLog('Top-level keys: ' + Object.keys(json).join(', '));
-      debugLog('Entries found: ' + entries.length);
-      if (entries.length > 0) {
-        debugLog('First entry keys: ' + Object.keys(entries[0]).join(', '));
-      }
-
-      var notices = [];
-      for (var i = 0; i < entries.length; i++) {
-        var row = parseNoticeEntry(entries[i]);
-        if (row && row[COL.NOTICE_ID]) notices.push(row);
-      }
-      debugLog('Successfully parsed: ' + notices.length + ' notices');
-      if (notices.length > 0) {
-        var detailed = await hydrateNoticesWithGazetteDetails(notices);
-        var enriched = await enrichNoticesWithCompaniesHouse(detailed);
-        mergeAndRefresh(enriched);
-        debugLog('Data loaded into table!');
-      } else {
-        debugLog('No notices parsed. Check the entry structure above.');
-      }
+      if (!entries.length) { alert('Pasted JSON has no entries. Make sure you copied the full response.'); return; }
+      stagedPastedPages.push({ entries: entries, count: entries.length });
+      $('#pasteJson').val('');
+      pasteNextPage++;
+      updatePasteSourceLink();
+      refreshPasteStagedStatus();
     } catch (e) {
       alert('JSON parse error: ' + e.message);
-      debugLog('Paste parse error: ' + e.message);
     }
+  });
+
+  $('#clearPastedPages').on('click', function() {
+    stagedPastedPages = [];
+    $('#pasteJson').val('');
+    pasteNextPage = 1;
+    updatePasteSourceLink();
+    refreshPasteStagedStatus();
+  });
+
+  $('#parsePasted').on('click', async function() {
+    // If user clicked Process without staging, treat the textarea as a single page.
+    var pages = stagedPastedPages.slice();
+    var raw = $('#pasteJson').val().trim();
+    if (raw) {
+      try {
+        var json = JSON.parse(raw);
+        var ents = json.entry || json.entries || json.items || [];
+        if (!Array.isArray(ents)) ents = [ents];
+        if (ents.length) pages.push({ entries: ents, count: ents.length });
+      } catch (e) {
+        alert('JSON parse error on the current paste: ' + e.message);
+        return;
+      }
+    }
+    if (pages.length === 0) { alert('Stage at least one page first (Add Page), or paste JSON in the box and click Process.'); return; }
+
+    // Parse all entries from all staged pages, filter to administration codes
+    var ADMIN_CODES = {'2410':1, '2411':1, '2412':1, '2413':1, '2414':1};
+    var notices = [];
+    var skipped = 0;
+    for (var p = 0; p < pages.length; p++) {
+      var ents2 = pages[p].entries || [];
+      for (var i = 0; i < ents2.length; i++) {
+        var code = ents2[i]['f:notice-code'] || '';
+        // If a notice-code is present and it's not an admin code, skip; otherwise parse.
+        if (code && !ADMIN_CODES[code]) { skipped++; continue; }
+        var row = parseNoticeEntry(ents2[i]);
+        if (row && row[COL.NOTICE_ID]) notices.push(row);
+      }
+    }
+
+    if (notices.length === 0) {
+      alert('No administration notices found in the pasted pages. ' + skipped + ' non-admin notices were skipped.');
+      return;
+    }
+
+    showProgress('Parsed <strong>' + notices.length + '</strong> notices from <strong>' + pages.length + '</strong> staged page(s). Skipping per-notice detail enrichment (WAF blocks it). Running Companies House enrichment if configured...', 50);
+
+    // Skip hydrateNoticesWithGazetteDetails — those endpoints are also WAF-blocked.
+    // The feed-content HTML parsing in parseNoticeEntry already captures the main fields.
+    var enriched = await enrichNoticesWithCompaniesHouse(notices);
+    mergeAndRefresh(enriched);
+
+    // Clear staged after successful processing
+    stagedPastedPages = [];
+    pasteNextPage = 1;
+    updatePasteSourceLink();
+    refreshPasteStagedStatus();
   });
 
   // ── Export Functions ─────────────────────────────────────
