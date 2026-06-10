@@ -749,7 +749,7 @@ table.dataTable a.notice-link:hover {
         <p style="margin:0 0 4px;"><strong>Fully by hand (no script at all):</strong></p>
         <ol style="margin:0 0 0 20px;">
           <li>Open <a id="pasteSourceLink" href="https://www.thegazette.co.uk/insolvency/notice/data.json?results-page-size=50&sort-by=latest-date" target="_blank" rel="noopener">the Gazette JSON list</a>, select all (Ctrl+A), copy (Ctrl+C), paste in the box, click <strong>Load Into Table</strong>. If a busy day spills past one page, change <code>results-page=2</code> in the URL and paste that too &mdash; duplicates are ignored.</li>
-          <li>For each notice's full details, open <strong>https://www.thegazette.co.uk/notice/{ID}/data.json?view=linked-data</strong>, copy the JSON (it starts with <code>{</code>), paste, and click <strong>Load Into Table</strong> again. (Details fill in Date of Appointment, Administrators, addresses &amp; Nature of Business, which the plain list leaves blank.)</li>
+          <li>For each notice's full details, open <strong>https://www.thegazette.co.uk/notice/{ID}/data.jsonld</strong>, copy the JSON (it starts with <code>{</code>), paste, and click <strong>Load Into Table</strong> again. (Details fill in Date of Appointment, Administrators, addresses &amp; Nature of Business, which the plain list leaves blank.) <em>This <code>data.jsonld</code> address is used in place of the older <code>data.json?view=linked-data</code> one, which the Gazette rate-limits with an HTTP 429 after a few opens.</em></li>
         </ol>
       </div>
     </details>
@@ -2864,9 +2864,94 @@ window.crmLookup = function(companyNum) {
     return rm ? rm[1] : '';
   }
 
+  // Convert a pasted Gazette JSON-LD notice record (…/notice/{id}/data.jsonld)
+  // into the linked-data "primaryTopic" shape applyGazetteNoticeDetail already
+  // understands. We point Step 3 at data.jsonld rather than
+  // data.json?view=linked-data because the Gazette rate-limits the latter
+  // (HTTP 429 after a few opens); the JSON-LD endpoint is not throttled and
+  // carries the same fields (Date of Appointment, administrators, addresses,
+  // nature of business). Returns null when the blob is not a JSON-LD @graph.
+  function jsonLdToDetailJson(json, rawText) {
+    var graph = json && json['@graph'];
+    if (!Array.isArray(graph) || !graph.length) return null;
+
+    var byId = {};
+    graph.forEach(function(n) { if (n && n['@id']) byId[n['@id']] = n; });
+
+    function types(n) { var t = n && n['@type']; return t == null ? [] : (Array.isArray(t) ? t : [t]); }
+    function typeHas(n, suffix) { return types(n).some(function(t) { return String(t).indexOf(suffix) !== -1; }); }
+    function deref(ref) {
+      if (ref == null) return null;
+      if (Array.isArray(ref)) ref = ref[0];
+      if (ref && typeof ref === 'object') return ref;
+      return byId[String(ref)] || null;
+    }
+    function addrLabelOf(ref) {
+      var a = deref(ref);
+      return a ? cleanText(a['street-address'] || a.label || a['rdfs:label'] || '') : '';
+    }
+    function orgNameOf(ref) {
+      var o = deref(ref);
+      if (!o) return '';
+      return cleanText(o['gazorg:name'] || o.organisationName || '').replace(/^of\s+/i, '').replace(/[,\s]+$/, '');
+    }
+    function findNode(test) { for (var i = 0; i < graph.length; i++) { if (graph[i] && test(graph[i])) return graph[i]; } return null; }
+
+    var notice = findNode(function(n) { return n.hasNoticeID != null || n.hasNoticeNumber != null || typeHas(n, ':Notice'); }) || {};
+    var thing = deref(notice.isAbout) || findNode(function(n) { return n.dateOfAppointment != null || n.hasAdministrator != null || typeHas(n, 'NotifiableThing'); }) || {};
+    var company = deref(thing.hasCompany) || findNode(function(n) { return n.companyNumber != null || n['gazorg:name'] || typeHas(n, 'Company'); }) || {};
+    var courtCase = deref(thing.hasCourtCase) || {};
+    var court = deref(courtCase.hasCourt) || {};
+
+    // Administrators: resolve each practitioner ref → name (+ IP number) and firm.
+    var firmCommon = orgNameOf(thing.hasOrganisationMember);
+    var adminRefs = thing.hasAdministrator;
+    adminRefs = adminRefs == null ? [] : (Array.isArray(adminRefs) ? adminRefs : [adminRefs]);
+    var administrators = adminRefs.map(function(ref) {
+      var p = deref(ref) || {};
+      var nm = cleanText(p.name || p.familyName || '');
+      var ip = cleanText(p.hasIPnum || '');
+      if (ip && nm) nm = nm + ' ' + ip;
+      else if (ip) nm = ip;
+      var firm = orgNameOf(p.hasOrganisationMember) || firmCommon;
+      return { name: nm, hasOrganisationMember: firm ? { organisationName: firm } : undefined };
+    }).filter(function(a) { return a.name; });
+
+    var company2 = {
+      organisationName: cleanText(company['gazorg:name'] || company.organisationName || ''),
+      companyNumber: cleanText(company.companyNumber || ''),
+      natureOfBusiness: cleanText(company.natureOfBusiness || '')
+    };
+    var regOffice = addrLabelOf(company.hasRegisteredOffice);
+    if (regOffice) company2.hasRegisteredOffice = { label: regOffice };
+    var principalAddr = addrLabelOf(company.hasPrincipalTradingAddress);
+    if (principalAddr) company2.hasPrincipalTradingAddress = { label: principalAddr };
+
+    var primaryTopic = {
+      hasNoticeID: cleanText(notice.hasNoticeID || (notice.hasNoticeNumber != null ? String(notice.hasNoticeNumber) : '')),
+      hasPublicationDate: cleanText(notice.hasPublicationDate || ''),
+      _about: notice['@id'] || '',
+      has_anchor: notice.has_anchor || notice['@id'] || '',
+      isAbout: {
+        dateOfAppointment: cleanText(thing.dateOfAppointment || ''),
+        administrator: administrators,
+        company: company2,
+        hasCourtCase: {
+          caseNumber: cleanText(courtCase.caseNumber || ''),
+          caseYear: cleanText(courtCase.caseYear || ''),
+          hasCourt: { courtName: cleanText(court.courtName || '').replace(/[,\s]+$/, '') }
+        }
+      }
+    };
+
+    return { result: { primaryTopic: primaryTopic }, __raw: rawText || JSON.stringify(json) };
+  }
+
   // Classify a pasted JSON blob. Throws on invalid JSON (caller handles).
   function classifyPastedJson(rawText) {
     var json = JSON.parse(rawText);
+    var ld = jsonLdToDetailJson(json, rawText);
+    if (ld) return { type: 'detail', detailJson: ld, noticeId: extractNoticeIdFromDetail(ld, rawText) };
     // One-shot bundle produced by the "Collect Gazette day" bookmarklet:
     // { format:'gazette-bundle', feed:[feed entries], details:[linked-data docs] }
     if (json && (json.format === 'gazette-bundle' || Array.isArray(json.feed) || Array.isArray(json.details))) {
@@ -3141,6 +3226,12 @@ window.crmLookup = function(companyNum) {
       return;
     }
 
+    // A pasted JSON-LD record (…/notice/{id}/data.jsonld) — the rate-limit-free
+    // detail endpoint — arrives as an @graph. Normalize it into the linked-data
+    // detail shape this handler already understands, then fall through as a detail.
+    var ldDetail = jsonLdToDetailJson(json, raw);
+    if (ldDetail) json = ldDetail;
+
     // 2) Identify the shape (feed list, single detail, or bundle), with diagnostics.
     var entries = json.entry || json.entries || json.items;
     var bundleDetails = (json.format === 'gazette-bundle' && Array.isArray(json.details)) ? json.details : null;
@@ -3179,7 +3270,7 @@ window.crmLookup = function(companyNum) {
         if (dr && dr[COL.NOTICE_ID]) detailRows.push(dr);
       } else {
         status('That looks like a notice record, but I could not find its Notice ID.', '#c0392b');
-        diag('&#9888;&#65039; This is a notice detail record, but no Notice ID was found. Make sure you copied the full <code>?view=linked-data</code> response.', '#c0392b');
+        diag('&#9888;&#65039; This is a notice detail record, but no Notice ID was found. Make sure you copied the full <code>data.jsonld</code> response.', '#c0392b');
         return;
       }
     } else {
@@ -3350,7 +3441,11 @@ window.crmLookup = function(companyNum) {
   }
 
   function detailUrlForNotice(id) {
-    return 'https://www.thegazette.co.uk/notice/' + id + '/data.json?view=linked-data';
+    // data.jsonld (not data.json?view=linked-data): the JSON-LD endpoint carries
+    // the same fields but is NOT rate-limited, so clicking through many notices
+    // no longer trips the Gazette's HTTP 429. The paste parser normalizes the
+    // JSON-LD @graph via jsonLdToDetailJson().
+    return 'https://www.thegazette.co.uk/notice/' + id + '/data.jsonld';
   }
 
   function trackedNotices() {
